@@ -1,0 +1,17 @@
+export interface DocumentState {
+  id: string;
+  title: string;
+  updatedAt: string;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+}
+
+export interface PresenceInfo {
+  userId: string;
+  status: "online" | "offline";
+}
+
+// TODO: Extend types to include cursor and selection metadata.

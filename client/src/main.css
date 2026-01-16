@@ -1,0 +1,67 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.5;
+  background-color: #f8f8f6;
+  color: #1a1a1a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  padding: 24px;
+  background: #111111;
+  color: #f3f1ea;
+}
+
+.app-main {
+  flex: 1;
+  padding: 24px;
+}
+
+.editor {
+  border: 1px solid #d9d3c7;
+  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.editor-toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.editor-toolbar button {
+  border: 1px solid #222222;
+  background: #f0eadf;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.editor-canvas {
+  min-height: 240px;
+  border: 1px dashed #c9c2b5;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.editor-presence {
+  font-size: 0.9rem;
+  color: #4d4d4d;
+}
