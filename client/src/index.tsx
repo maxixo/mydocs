@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
-import App from "./app/App";
+import { RouterProvider } from "react-router-dom";
+import { router } from "./app/routes";
 import "./main.css";
 import { registerServiceWorker } from "./workers/serviceWorker";
 
@@ -9,6 +10,6 @@ if (!rootElement) {
   throw new Error("Root element not found");
 }
 
-createRoot(rootElement).render(<App />);
+createRoot(rootElement).render(<RouterProvider router={router} />);
 
 registerServiceWorker();

@@ -1,11 +1,21 @@
-import type { RouteObject } from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
 import App from "./App";
+import { SignIn } from "./SignIn";
+import { SignUp } from "./SignUp";
 
-export const routes: RouteObject[] = [
+export const router = createBrowserRouter([
   {
     path: "/",
     element: <App />
+  },
+  {
+    path: "/auth/sign-in",
+    element: <SignIn />
+  },
+  {
+    path: "/auth/sign-up",
+    element: <SignUp />
   }
-];
+]);
 
-// TODO: Add auth and document routes.
+// TODO: Add protected document routes and auth guards.
