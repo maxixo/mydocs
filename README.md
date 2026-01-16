@@ -46,7 +46,7 @@ Option B: Use your own instances
 1. From the repo root:
    - `npm run dev`
 2. Client runs on:
-   - `http://localhost:5173/public/index.html`
+   - `http://localhost:5173/`
 3. Server runs on:
    - `http://localhost:4000`
 

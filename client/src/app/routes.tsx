@@ -1,12 +1,17 @@
 import { createBrowserRouter } from "react-router-dom";
 import App from "./App";
-import { SignIn } from "./SignIn";
-import { SignUp } from "./SignUp";
+import { ProtectedRoute } from "./ProtectedRoute";
+import { SignIn } from "../pages/SignIn";
+import { SignUp } from "../pages/SignUp";
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <App />
+    element: (
+      <ProtectedRoute>
+        <App />
+      </ProtectedRoute>
+    )
   },
   {
     path: "/auth/sign-in",

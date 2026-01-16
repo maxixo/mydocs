@@ -134,7 +134,7 @@ From the repo root:
 - `npm run dev`
 
 URLs:
-- Client: `http://localhost:5173/public/index.html`
+- Client: `http://localhost:5173/`
 - Server: `http://localhost:4000`
 
 ### 6) Run client and server separately (optional)
