@@ -1,18 +1,34 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { OAuthGoogleButton } from "./OAuthGoogleButton";
+import { signUpWithEmail } from "../services/auth.service";
 
 export const SignUp = () => {
+  const navigate = useNavigate();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // TODO: Call auth API to create a new account.
-  };
+    setError(null);
+    setLoading(true);
 
-  const handleGoogleSignIn = () => {
-    // TODO: Use Firebase Auth (Google provider) and exchange ID token with the server.
+    try {
+      const result = await signUpWithEmail(displayName, email, password);
+      if (result.token) {
+        localStorage.setItem("auth_token", result.token);
+        localStorage.setItem("auth_provider", "better-auth");
+      }
+      navigate("/");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Sign up failed";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -63,14 +79,13 @@ export const SignUp = () => {
             onChange={(event) => setPassword(event.target.value)}
             required
           />
-          <button className="auth-button" type="submit">
-            Sign up
+          <button className="auth-button" type="submit" disabled={loading}>
+            {loading ? "Creating account..." : "Sign up"}
           </button>
         </form>
+        {error ? <p className="auth-error">{error}</p> : null}
         <div className="auth-divider">or</div>
-        <button className="auth-google" type="button" onClick={handleGoogleSignIn}>
-          Continue with Google
-        </button>
+        <OAuthGoogleButton label="Continue with Google" />
         <p className="auth-footer">
           Already have an account? <Link to="/auth/sign-in">Sign in</Link>
         </p>

@@ -1,9 +1,9 @@
 # Server + Auth Implementation Plan (MVP)
 
-This plan covers how to implement the API routes, WebSockets, and authentication (using Better Auth for credentials plus Firebase Google Sign-In on the client). It is scoped to an MVP and assumes a Unix-based environment.
+This plan covers how to implement the API routes, WebSockets, and authentication (using Better Auth for credentials and Google OAuth). It is scoped to an MVP and assumes a Unix-based environment.
 
 ## Goals (MVP)
-- Users can sign up and sign in (email/password + Google Sign-In via Firebase client).
+- Users can sign up and sign in (email/password + Google OAuth).
 - Authenticated users can create, list, and open documents.
 - Real-time collaboration over WebSockets with Yjs sync stubs.
 - Basic presence (who is online in a doc) over WebSockets.
@@ -11,7 +11,7 @@ This plan covers how to implement the API routes, WebSockets, and authentication
 
 ## Implementation Order
 1. Database setup (Postgres schema + migrations).
-2. Auth foundation (Better Auth + Firebase Google Sign-In).
+2. Auth foundation (Better Auth + Google OAuth).
 3. Core API routes (documents + users).
 4. WebSocket layer (auth handshake + rooms + broadcasts).
 5. Client auth pages (sign-in, sign-up, Google button).
@@ -43,9 +43,11 @@ All responses should be JSON and use a consistent envelope:
   - Clears session cookie or invalidates token
 - `GET /api/auth/me`
   - Returns current user if authenticated
-- `POST /api/auth/firebase`
-  - Body: `{ idToken }`
-  - Verifies Firebase ID token and creates a server session
+- `POST /api/auth/sign-in/social`
+  - Body: `{ provider: "google", callbackURL }`
+  - Starts Google OAuth and redirects the user
+- `GET /api/auth/callback/google`
+  - Handles OAuth callback and creates a session
 
 ### User Routes
 - `GET /api/users/me`
@@ -89,17 +91,13 @@ Use `ws` and keep one WS server at `/ws`.
 - Broadcast updates to all sockets in the same room.
 - Add heartbeat/ping to keep connections alive.
 
-## Auth Plan (Better Auth + Firebase Google Sign-In)
-Use Better Auth for credential auth, and Firebase Auth for Google Sign-In on the client.
+## Auth Plan (Better Auth + Google OAuth)
+Use Better Auth for credential auth and Google OAuth.
 
 ### 1) Install dependencies
 Add to server workspace:
 - `better-auth`
 - A database adapter supported by Better Auth (ex: Prisma or Drizzle)
-- `firebase-admin` (to verify Firebase ID tokens)
-
-Add to client workspace:
-- `firebase` (Firebase JS SDK)
 
 ### 2) Choose session strategy
 Recommended for SPA:
@@ -113,11 +111,8 @@ Create a server auth module that:
 - Adds providers: `credentials`.
 - Exposes handlers for login/signup/logout/me.
 
-### 4) Add Firebase token exchange
-Create a new route `POST /api/auth/firebase` that:
-- Verifies `idToken` with Firebase Admin.
-- Upserts the user record by Firebase UID/email.
-- Issues a Better Auth session or your own session cookie.
+### 4) Enable Google OAuth
+Configure Better Auth `socialProviders.google` with a Google OAuth client ID/secret.
 
 ### 5) Wire Express routes
 Routes in `server/src/api/auth.routes.ts` should call Better Auth handlers and return JSON responses.
@@ -138,8 +133,8 @@ Implement two routes and a shared auth layout.
 - Email + password form.
 - Submit to `POST /api/auth/login`.
 - On success, redirect to `/`.
-- Add a "Sign in with Google" button using Firebase Auth popup/redirect.
-- After Firebase sign-in, send `idToken` to `POST /api/auth/firebase`.
+- Add a "Sign in with Google" button that calls `POST /api/auth/sign-in/social`.
+- Redirect the browser to the returned OAuth URL.
 
 ### Sign-up Page
 - Email + password + display name form.
@@ -159,32 +154,21 @@ Recommended environment variables (server):
 - `REDIS_URL=redis://localhost:6379`
 - `AUTH_SECRET=change-me` (Better Auth secret)
 - `AUTH_BASE_URL=http://localhost:4000`
-- `FIREBASE_PROJECT_ID=...`
-- `FIREBASE_CLIENT_EMAIL=...`
-- `FIREBASE_PRIVATE_KEY=...`
-
-Recommended environment variables (client):
-- `VITE_FIREBASE_API_KEY=...`
-- `VITE_FIREBASE_AUTH_DOMAIN=...`
-- `VITE_FIREBASE_PROJECT_ID=...`
-- `VITE_FIREBASE_APP_ID=...`
-- `VITE_FIREBASE_MESSAGING_SENDER_ID=...`
-- `VITE_FIREBASE_STORAGE_BUCKET=...`
+- `GOOGLE_CLIENT_ID=...`
+- `GOOGLE_CLIENT_SECRET=...`
 
 If Better Auth requires different variable names, align your config with its docs.
 
-### Where to get keys (Firebase)
-- Firebase Console:
-  1. Create a Firebase project.
-  2. Authentication -> Sign-in method -> Enable Google provider.
-  3. Project settings -> General -> Add Web App.
-  4. Copy the Firebase config values into `VITE_FIREBASE_*`.
-  5. Project settings -> Service accounts -> Generate new private key.
-  6. Use the service account JSON to set:
-     - `FIREBASE_PROJECT_ID`
-     - `FIREBASE_CLIENT_EMAIL`
-     - `FIREBASE_PRIVATE_KEY`
-  7. Note: if you store `FIREBASE_PRIVATE_KEY` in `.env`, replace newlines with `\n`.
+### Where to get keys (Google OAuth)
+- Google Cloud Console:
+  1. APIs & Services -> Credentials -> Create OAuth client ID (Web).
+  2. Add authorized origins:
+     - `http://localhost:5173`
+  3. Add redirect URI:
+     - `http://localhost:4000/api/auth/callback/google`
+  4. Copy Client ID/Secret into:
+     - `GOOGLE_CLIENT_ID`
+     - `GOOGLE_CLIENT_SECRET`
 - Auth secret:
   - Generate with:
     - `openssl rand -base64 32`
@@ -204,8 +188,8 @@ If Better Auth requires different variable names, align your config with its doc
 ## MVP Checklist
 - Auth routes returning valid JSON.
 - Protected document routes.
-- Firebase Google sign-in works locally.
-- Server exchanges Firebase ID token for an app session.
+- Google OAuth sign-in works locally.
+- Server creates a Better Auth session after the callback.
 - WebSocket handshake authenticates and joins rooms.
 - Yjs updates broadcast between clients.
 - Client sign-in/up pages submit to API and redirect.
@@ -213,6 +197,5 @@ If Better Auth requires different variable names, align your config with its doc
 
 ## References
 - Better Auth docs: https://better-auth.com/docs
-- Firebase Auth (Web): https://firebase.google.com/docs/auth/web/start
-- Firebase Admin SDK: https://firebase.google.com/docs/admin/setup
+- Google OAuth setup: https://console.cloud.google.com/apis/credentials
 - Postgres docs: https://www.postgresql.org/docs/

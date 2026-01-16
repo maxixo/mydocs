@@ -1,0 +1,52 @@
+import { useState } from "react";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
+
+interface OAuthGoogleButtonProps {
+  label?: string;
+}
+
+export const OAuthGoogleButton = ({ label = "Sign in with Google" }: OAuthGoogleButtonProps) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/sign-in/social`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          provider: "google",
+          callbackURL: window.location.origin,
+          disableRedirect: true
+        })
+      });
+
+      const data = (await response.json()) as { url?: string };
+
+      if (!response.ok || !data.url) {
+        throw new Error("Unable to start Google sign-in");
+      }
+
+      window.location.href = data.url;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Google sign-in failed";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <button className="auth-google" type="button" onClick={handleGoogleSignIn} disabled={loading}>
+        {loading ? "Signing in..." : label}
+      </button>
+      {error ? <p className="auth-error">{error}</p> : null}
+    </div>
+  );
+};

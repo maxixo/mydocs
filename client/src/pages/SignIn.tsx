@@ -1,17 +1,31 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { OAuthGoogleButton } from "./OAuthGoogleButton";
+import { signInWithEmail } from "../services/auth.service";
 
 export const SignIn = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // TODO: Call auth API to sign in with email/password.
-  };
+    setError(null);
+    setLoading(true);
 
-  const handleGoogleSignIn = () => {
-    // TODO: Use Firebase Auth (Google provider) and exchange ID token with the server.
+    try {
+      const result = await signInWithEmail(email, password);
+      localStorage.setItem("auth_token", result.token);
+      localStorage.setItem("auth_provider", "better-auth");
+      navigate("/");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Sign in failed";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -48,14 +62,13 @@ export const SignIn = () => {
             onChange={(event) => setPassword(event.target.value)}
             required
           />
-          <button className="auth-button" type="submit">
-            Sign in
+          <button className="auth-button" type="submit" disabled={loading}>
+            {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
+        {error ? <p className="auth-error">{error}</p> : null}
         <div className="auth-divider">or</div>
-        <button className="auth-google" type="button" onClick={handleGoogleSignIn}>
-          Sign in with Google
-        </button>
+        <OAuthGoogleButton label="Sign in with Google" />
         <p className="auth-footer">
           New here? <Link to="/auth/sign-up">Create an account</Link>
         </p>
