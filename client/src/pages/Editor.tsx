@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 export const Editor = () => {
   return (
     <div className="editor-view bg-background-light text-[#0d0e1b] dark:bg-background-dark dark:text-[#f8f8fc] font-['Inter',_sans-serif]">
@@ -30,9 +32,9 @@ export const Editor = () => {
               <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-wider text-[#4c4d9a]">
                 Navigation
               </p>
-              <a
+              <Link
                 className="flex items-center gap-3 rounded-lg bg-[#e7e7f3] px-3 py-2 text-[#0d0e1b] dark:bg-[#1c1d3a] dark:text-white"
-                href="#"
+                to="/editor/recent"
               >
                 <span
                   className="material-symbols-outlined"
@@ -41,7 +43,7 @@ export const Editor = () => {
                   schedule
                 </span>
                 <span className="text-sm font-medium">Recent</span>
-              </a>
+              </Link>
               <a
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-[#4c4d9a] hover:bg-[#e7e7f3]/50 dark:text-[#8a8bbd] dark:hover:bg-[#1c1d3a]/50"
                 href="#"
