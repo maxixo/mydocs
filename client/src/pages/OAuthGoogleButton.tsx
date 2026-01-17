@@ -1,12 +1,22 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
 
 interface OAuthGoogleButtonProps {
   label?: string;
+  className?: string;
+  containerClassName?: string;
+  errorClassName?: string;
+  children?: ReactNode;
 }
 
-export const OAuthGoogleButton = ({ label = "Sign in with Google" }: OAuthGoogleButtonProps) => {
+export const OAuthGoogleButton = ({
+  label = "Sign in with Google",
+  className = "auth-google",
+  containerClassName,
+  errorClassName,
+  children
+}: OAuthGoogleButtonProps) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,11 +52,11 @@ export const OAuthGoogleButton = ({ label = "Sign in with Google" }: OAuthGoogle
   };
 
   return (
-    <div>
-      <button className="auth-google" type="button" onClick={handleGoogleSignIn} disabled={loading}>
-        {loading ? "Signing in..." : label}
+    <div className={containerClassName}>
+      <button className={className} type="button" onClick={handleGoogleSignIn} disabled={loading} aria-label={label}>
+        {loading ? "Signing in..." : children ?? label}
       </button>
-      {error ? <p className="auth-error">{error}</p> : null}
+      {error ? <p className={errorClassName ?? "auth-error"}>{error}</p> : null}
     </div>
   );
 };
