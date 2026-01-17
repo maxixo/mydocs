@@ -3,15 +3,19 @@ import App from "./App";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { SignIn } from "../pages/SignIn";
 import { SignUp } from "../pages/SignUp";
+import { Editor } from "../pages/Editor";
 
 export const router = createBrowserRouter([
   {
     path: "/",
     element: (
-      <ProtectedRoute>
+      // <ProtectedRoute>
         <App />
-      </ProtectedRoute>
     )
+  },
+  {
+    path: "/editor",
+    element: <Editor />
   },
   {
     path: "/auth/sign-in",

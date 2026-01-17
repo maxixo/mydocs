@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>User Sign In | DesignApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-start": "#6366f1",
+                        "primary-end": "#8b5cf6",
+                        "background-dark": "#0a0a0f",
+                        "text-primary": "#fafafa",
+                    },
+                    fontFamily: {
+                        "display": ["Spline Sans", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.75rem",
+                        "lg": "1.5rem",
+                        "xl": "2.25rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body {
+            font-family: "Spline Sans", sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bg-brand-gradient {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        }
+    </style>
+</head>
+<body class="bg-[#0a0a0f] min-h-screen flex flex-col overflow-x-hidden text-[#fafafa]">
+<div class="flex flex-1 flex-col @container">
+<main class="flex flex-1 flex-col lg:flex-row min-h-screen">
+<section class="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-brand-gradient p-16 flex-col justify-between items-start">
+<div class="absolute inset-0 z-0 opacity-20 bg-cover bg-center mix-blend-overlay" data-alt="Abstract background" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDcoAQlcT6-Ju4h6A6yC0UkvYDO-5pqJV8VzdlNRLI-Tr_UyjGmoZ9A-IYOmaTJ-etYhoaDuvveYvtDKl-PfCfs4O_VVpreD1V5frlfPXK5qLGHwPuXWJfO2wT18gpu8dpSKIi0E5HWnoYb8DcO6YoOmPMaf52UoJ25ySDWuIlTFgMjBptiJOWRg4k6VO0cJgUUpCwjvFYtMNJsQtm4l7l8Hle0Ee582Nomy8inA7OTquSKcUPEacXRxmowBtUuw5_SNnt0O5eiYw");'>
+</div>
+<div class="relative z-20 flex items-center gap-3">
+<div class="size-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white">
+<svg class="w-6 h-6" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path d="M6 6H42L36 24L42 42H6L12 24L6 6Z" fill="currentColor"></path>
+</svg>
+</div>
+<h2 class="text-2xl font-bold tracking-tight text-white">DesignApp</h2>
+</div>
+<div class="relative z-20 max-w-lg">
+<h1 class="text-white text-6xl font-black leading-tight tracking-[-0.033em] mb-8">
+                    Collaborate without boundaries.
+                </h1>
+<p class="text-white/80 text-xl font-medium leading-relaxed">
+                    The next generation collaborative text editor for high-performance teams.
+                </p>
+</div>
+<div class="relative z-20 flex gap-6 text-xs font-semibold text-white/60 uppercase tracking-widest">
+<span>© 2024 DesignApp Inc.</span>
+<a class="hover:text-white transition-colors" href="#">Privacy</a>
+<a class="hover:text-white transition-colors" href="#">Terms</a>
+</div>
+</section>
+<section class="flex-1 flex flex-col justify-center items-center px-6 py-12 lg:px-20 bg-[#0a0a0f]">
+<div class="w-full max-w-[440px] flex flex-col">
+<div class="flex lg:hidden items-center gap-3 mb-10">
+<div class="size-8 bg-brand-gradient rounded-lg flex items-center justify-center text-white">
+<svg class="w-5 h-5" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path d="M6 6H42L36 24L42 42H6L12 24L6 6Z" fill="currentColor"></path>
+</svg>
+</div>
+<h2 class="text-xl font-bold tracking-tight text-white">DesignApp</h2>
+</div>
+<div class="flex flex-col gap-3 mb-10">
+<h2 class="text-4xl font-black leading-tight tracking-tight text-[#fafafa]">Sign In</h2>
+<p class="text-gray-400 text-base">
+                        New here? <a class="text-[#8b5cf6] font-bold hover:text-[#a78bfa] transition-colors" href="#">Create an account</a>
+</p>
+</div>
+<form class="flex flex-col gap-6">
+<div class="flex flex-col gap-2">
+<label class="text-[#fafafa] text-sm font-semibold px-1">Email Address</label>
+<input class="flex w-full rounded-xl text-[#fafafa] border border-white/10 bg-white/5 h-14 placeholder:text-gray-500 px-6 text-base focus:ring-2 focus:ring-[#6366f1] focus:border-transparent outline-none transition-all" placeholder="name@company.com" type="email"/>
+</div>
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-center px-1">
+<label class="text-[#fafafa] text-sm font-semibold">Password</label>
+<a class="text-xs font-bold text-[#8b5cf6] hover:text-[#a78bfa] transition-colors" href="#">Forgot Password?</a>
+</div>
+<div class="relative flex items-center">
+<input class="flex w-full rounded-xl text-[#fafafa] border border-white/10 bg-white/5 h-14 placeholder:text-gray-500 px-6 text-base focus:ring-2 focus:ring-[#6366f1] focus:border-transparent outline-none transition-all" placeholder="Enter your password" type="password"/>
+<button class="absolute right-5 text-gray-500 hover:text-[#fafafa] transition-colors" type="button">
+<span class="material-symbols-outlined">visibility</span>
+</button>
+</div>
+</div>
+<button class="mt-4 flex w-full cursor-pointer items-center justify-center rounded-xl h-14 bg-brand-gradient text-white text-base font-bold tracking-wide hover:opacity-90 active:scale-[0.98] transition-all shadow-xl shadow-indigo-500/20" type="submit">
+                        Sign In
+                    </button>
+</form>
+<div class="relative my-10 flex items-center">
+<div class="flex-grow border-t border-white/10"></div>
+<span class="flex-shrink mx-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Or continue with</span>
+<div class="flex-grow border-t border-white/10"></div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<button class="flex items-center justify-center gap-3 rounded-xl h-14 border border-white/10 bg-white/5 text-[#fafafa] hover:bg-white/10 transition-colors">
+<img alt="Google logo" class="w-5 h-5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDWZKCrcp7uTsv3GH9yIzlmZM9DrMBQOVtD-UvMr9FHnmMoWx7lv6Ai7GR5J5uZYl4a8tLB-G7vOLhaGLVdJlETZ_lLDfgUWaPKJ8WC2tlYXmVQrHtVM6CxYJc-2Pzyk4sTD8te4q3sDBnvTP5fHEnakAXtbfbzbwFYBbvMR5ojlZQgoQcV-tneasO-BXpMGmzKuv76TkvXtx3viFbSuX-AphylHfWb4y7SMTvk9JZHUFBAcxXVz_L3dmfr7xf0oEhm767Yv7JrQ"/>
+<span class="text-sm font-bold">Google</span>
+</button>
+<button class="flex items-center justify-center gap-3 rounded-xl h-14 border border-white/10 bg-white/5 text-[#fafafa] hover:bg-white/10 transition-colors">
+<img alt="Apple logo" class="w-5 h-5 invert" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsF8p0FDtUXdsQNUB8tx7ZQl9oSh74a4VzAWGhDGCGj6QifR2QnAioxXEE4SjtMnXSjZq5H2nvNtvQ-IHZhHfmjUO39yrv6uEu-dVPBFVN3Y-Kk5EnyiBKjZQbFSvnbMIG80rWuIDv5PIYvjMjf56pN8-BauQ-SUNcf_UZiiBbLbha7k6yd37Aq23RXG9qv1J4tgh1sL8jmWrmFWv3PP9X6LCLndF8sLzV4B8cVsKInWeSTkjG81p9hAmx1UX1vTId5eZTfCI5PQ"/>
+<span class="text-sm font-bold">Apple</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+</div>
+
+</body></html>
