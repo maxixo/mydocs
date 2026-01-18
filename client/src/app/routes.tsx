@@ -18,7 +18,7 @@ export const router = createBrowserRouter([
     path: "/editor",
     element: (
       <ProtectedRoute>
-        <Navigate to="/editor/recent" replace />
+        <Editor/>
       </ProtectedRoute>
     )
   },

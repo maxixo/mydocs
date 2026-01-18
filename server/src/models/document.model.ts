@@ -12,23 +12,42 @@ export interface DocumentModel extends DocumentSummary {
   content: TipTapContent;
 }
 
-export const mapDocumentRow = (_row: unknown): DocumentModel => {
-  const row = typeof _row === "object" && _row !== null ? (_row as Record<string, unknown>) : {};
-  const updatedAt =
-    typeof row.updatedAt === "string"
-      ? row.updatedAt
-      : typeof row.updated_at === "string"
-        ? row.updated_at
-        : new Date().toISOString();
+const parseUpdatedAt = (row: Record<string, unknown>) => {
+  if (typeof row.updatedAt === "string") {
+    return row.updatedAt;
+  }
+  if (typeof row.updated_at === "string") {
+    return row.updated_at;
+  }
+  if (row.updated_at instanceof Date) {
+    return row.updated_at.toISOString();
+  }
+  return new Date().toISOString();
+};
 
+const parseContent = (value: unknown): TipTapContent => {
+  if (typeof value === "object" && value !== null) {
+    return value as TipTapContent;
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as TipTapContent;
+      if (typeof parsed === "object" && parsed !== null) {
+        return parsed;
+      }
+    } catch {
+      // fall through to default
+    }
+  }
+  return { type: "doc", content: [] };
+};
+
+export const mapDocumentSummaryRow = (_row: unknown): DocumentSummary => {
+  const row = typeof _row === "object" && _row !== null ? (_row as Record<string, unknown>) : {};
   return {
     id: typeof row.id === "string" ? row.id : "",
     title: typeof row.title === "string" ? row.title : "",
-    content:
-      typeof row.content === "object" && row.content !== null
-        ? (row.content as TipTapContent)
-        : { type: "doc", content: [] },
-    updatedAt,
+    updatedAt: parseUpdatedAt(row),
     ownerId: typeof row.ownerId === "string" ? row.ownerId : typeof row.owner_id === "string" ? row.owner_id : "",
     workspaceId:
       typeof row.workspaceId === "string"
@@ -36,5 +55,13 @@ export const mapDocumentRow = (_row: unknown): DocumentModel => {
         : typeof row.workspace_id === "string"
           ? row.workspace_id
           : ""
+  };
+};
+
+export const mapDocumentRow = (_row: unknown): DocumentModel => {
+  const row = typeof _row === "object" && _row !== null ? (_row as Record<string, unknown>) : {};
+  return {
+    ...mapDocumentSummaryRow(row),
+    content: parseContent(row.content)
   };
 };

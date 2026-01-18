@@ -1,19 +1,20 @@
 import { randomUUID } from "crypto";
 import { Router } from "express";
-import { listDocuments, getDocumentById } from "../services/document.service.js";
-import { checkPermission } from "../services/permission.service.js";
 import type { DocumentModel } from "../models/document.model.js";
+import { authMiddleware, type AuthenticatedRequest } from "../middlewares/auth.middleware.js";
+import {
+  createDocument,
+  getDocumentById,
+  listDocuments,
+  updateDocument
+} from "../services/document.service.js";
+import { canEditDocument, getDocumentRole } from "../services/permission.service.js";
 
 export const documentRoutes = Router();
 
-const getUserId = (headerValue: string | undefined): string => {
-  if (typeof headerValue === "string" && headerValue.trim()) {
-    return headerValue;
-  }
-  return "anonymous";
-};
+documentRoutes.use(authMiddleware);
 
-documentRoutes.get("/", async (req, res, next) => {
+documentRoutes.get("/", async (req: AuthenticatedRequest, res, next) => {
   try {
     const workspaceId = typeof req.query.workspaceId === "string" ? req.query.workspaceId : "";
     if (!workspaceId) {
@@ -21,14 +22,15 @@ documentRoutes.get("/", async (req, res, next) => {
       return;
     }
 
-    const documents = await listDocuments(workspaceId);
+    const userId = req.user?.id ?? "";
+    const documents = await listDocuments(workspaceId, userId);
     res.json({ documents });
   } catch (error) {
     next(error);
   }
 });
 
-documentRoutes.post("/", async (req, res, next) => {
+documentRoutes.post("/", async (req: AuthenticatedRequest, res, next) => {
   try {
     const { title, content, workspaceId } = req.body as {
       title?: string;
@@ -41,23 +43,23 @@ documentRoutes.post("/", async (req, res, next) => {
       return;
     }
 
-    const ownerId = getUserId(req.header("x-user-id"));
     const document: DocumentModel = {
       id: randomUUID(),
       title: title?.trim() || "Untitled document",
       content: content ?? { type: "doc", content: [] },
       updatedAt: new Date().toISOString(),
-      ownerId,
+      ownerId: req.user?.id ?? "",
       workspaceId
     };
 
-    res.status(201).json({ document });
+    const createdDocument = await createDocument(document);
+    res.status(201).json({ document: createdDocument });
   } catch (error) {
     next(error);
   }
 });
 
-documentRoutes.get("/:id", async (req, res, next) => {
+documentRoutes.get("/:id", async (req: AuthenticatedRequest, res, next) => {
   try {
     const workspaceId = typeof req.query.workspaceId === "string" ? req.query.workspaceId : "";
     if (!workspaceId) {
@@ -65,20 +67,58 @@ documentRoutes.get("/:id", async (req, res, next) => {
       return;
     }
 
-    const userId = getUserId(req.header("x-user-id"));
-    const allowed = await checkPermission(userId, req.params.id);
-    if (!allowed) {
+    const userId = req.user?.id ?? "";
+    const role = await getDocumentRole(userId, req.params.id, workspaceId);
+    if (!role) {
       res.status(403).json({ message: "Access denied" });
       return;
     }
 
-    const document = await getDocumentById(req.params.id, workspaceId);
+    const document = await getDocumentById(req.params.id, workspaceId, userId);
     if (!document) {
       res.status(404).json({ message: "Document not found" });
       return;
     }
 
     res.json({ document });
+  } catch (error) {
+    next(error);
+  }
+});
+
+documentRoutes.patch("/:id", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const workspaceId = typeof req.query.workspaceId === "string" ? req.query.workspaceId : "";
+    if (!workspaceId) {
+      res.status(400).json({ message: "workspaceId is required" });
+      return;
+    }
+
+    const { title, content } = req.body as {
+      title?: string;
+      content?: Record<string, unknown>;
+    };
+
+    const userId = req.user?.id ?? "";
+    const role = await getDocumentRole(userId, req.params.id, workspaceId);
+    if (!canEditDocument(role)) {
+      res.status(403).json({ message: "Access denied" });
+      return;
+    }
+
+    const updated = await updateDocument({
+      id: req.params.id,
+      workspaceId,
+      title: title?.trim(),
+      content
+    });
+
+    if (!updated) {
+      res.status(404).json({ message: "Document not found" });
+      return;
+    }
+
+    res.json({ document: updated });
   } catch (error) {
     next(error);
   }
