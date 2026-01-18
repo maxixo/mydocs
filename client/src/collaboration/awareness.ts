@@ -19,7 +19,7 @@ export const createAwareness = (awareness: Awareness) => {
       const current = awareness.getLocalState() as AwarenessUserState | null;
       return current?.user ?? null;
     },
-    onChange: (handler: () => void) => {
+    onChange: (handler: (...args: unknown[]) => void) => {
       awareness.on("change", handler);
       return () => awareness.off("change", handler);
     }

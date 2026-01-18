@@ -215,59 +215,15 @@ export const Editor = () => {
           </header>
 
           <div className="editor-grid relative flex-1 overflow-y-auto dark:bg-[#0b0c18]">
-            <div className="pointer-events-none sticky top-6 z-30 flex justify-center">
-              <div className="pointer-events-auto flex items-center gap-1 rounded-xl border border-[#e7e7f3] bg-white p-1.5 shadow-xl dark:border-[#2d2e4a] dark:bg-[#1c1d3a]">
-                <button className="rounded p-1.5 text-[#4c4d9a] hover:bg-background-light hover:text-primary dark:text-[#8a8bbd] dark:hover:bg-primary/20">
-                  <span className="material-symbols-outlined">format_bold</span>
-                </button>
-                <button className="rounded p-1.5 text-[#4c4d9a] hover:bg-background-light hover:text-primary dark:text-[#8a8bbd] dark:hover:bg-primary/20">
-                  <span className="material-symbols-outlined">format_italic</span>
-                </button>
-                <button className="rounded p-1.5 text-[#4c4d9a] hover:bg-background-light hover:text-primary dark:text-[#8a8bbd] dark:hover:bg-primary/20">
-                  <span className="material-symbols-outlined">format_underlined</span>
-                </button>
-                <div className="mx-1 h-5 w-px bg-[#e7e7f3] dark:bg-[#2d2e4a]"></div>
-                <button className="rounded p-1.5 text-[#4c4d9a] hover:bg-background-light hover:text-primary dark:text-[#8a8bbd] dark:hover:bg-primary/20">
-                  <span className="material-symbols-outlined">format_list_bulleted</span>
-                </button>
-                <button className="rounded p-1.5 text-[#4c4d9a] hover:bg-background-light hover:text-primary dark:text-[#8a8bbd] dark:hover:bg-primary/20">
-                  <span className="material-symbols-outlined">link</span>
-                </button>
-                <button className="rounded p-1.5 text-[#4c4d9a] hover:bg-background-light hover:text-primary dark:text-[#8a8bbd] dark:hover:bg-primary/20">
-                  <span className="material-symbols-outlined">image</span>
-                </button>
-                <div className="mx-1 h-5 w-px bg-[#e7e7f3] dark:bg-[#2d2e4a]"></div>
-                <button className="rounded p-1.5 text-[#4c4d9a] hover:bg-background-light hover:text-primary dark:text-[#8a8bbd] dark:hover:bg-primary/20">
-                  <span className="material-symbols-outlined">chat_bubble</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="relative mx-auto my-12 min-h-[1000px] max-w-[800px] border border-[#e7e7f3] bg-white p-24 shadow-sm dark:border-[#2d2e4a] dark:bg-[#101122]">
-              <div
-                className="cursor-indicator absolute left-64 top-48 h-6 w-[2px] bg-green-500 transition-all"
-                data-name="Sarah"
-                style={{ zIndex: 10 }}
-              ></div>
-              <div
-                className="cursor-indicator absolute left-96 top-[420px] h-6 w-[2px] bg-purple-500 transition-all"
-                data-name="James"
-                style={{ zIndex: 10 }}
-              ></div>
-
-              <article className="max-w-none">
-                <h1 className="mb-8 text-4xl font-bold capitalize text-[#0d0e1b] dark:text-white">{docTitle}</h1>
-                {loading ? (
-                  <p className="text-base text-[#4c4d9a] dark:text-[#8a8bbd]">Loading document...</p>
-                ) : error ? (
-                  <p className="text-base text-red-500">{error}</p>
-                ) : (
-                  <EditorContent editor={editor} className="tiptap text-lg leading-relaxed" />
-                )}
-              </article>
-
-              <div className="absolute left-[100px] top-[420px] -z-0 h-6 w-32 border-l-2 border-purple-500 bg-purple-500/10"></div>
-            </div>
+            <EditorSurface
+              documentId={documentId}
+              content={editorContent}
+              editable={isEditable}
+              onChange={handleContentChange}
+              docTitle={docTitle}
+              loading={loading}
+              error={error}
+            />
           </div>
 
           <footer className="flex h-8 items-center justify-between border-t border-[#e7e7f3] bg-white px-6 text-[10px] font-medium uppercase tracking-widest text-[#4c4d9a] dark:border-[#2d2e4a] dark:bg-background-dark">
