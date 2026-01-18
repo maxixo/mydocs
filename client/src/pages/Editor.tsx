@@ -1,10 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { EditorContent, useEditor } from "@tiptap/react";
 import type { JSONContent } from "@tiptap/core";
-import StarterKit from "@tiptap/starter-kit";
+import { EditorSurface } from "../editor/Editor";
 import { useDocument } from "../hooks/useDocument";
-import { EMPTY_TIPTAP_DOC, sanitizeTipTapContent } from "../utils/tiptapContent";
+import { EMPTY_TIPTAP_DOC } from "../utils/tiptapContent";
 
 export const Editor = () => {
   const emptyContent: JSONContent = EMPTY_TIPTAP_DOC;
@@ -12,7 +11,6 @@ export const Editor = () => {
   const [searchParams] = useSearchParams();
   const workspaceId = searchParams.get("workspaceId") ?? "default";
   const { document, updateDocument, loading, error } = useDocument(id, workspaceId);
-  const lastLoadedId = useRef<string | null>(null);
   const documentRef = useRef(document);
   const updateDocumentRef = useRef(updateDocument);
   const fallbackTitle = id ? id.replace(/-/g, " ") : "Untitled document";
@@ -26,45 +24,22 @@ export const Editor = () => {
     updateDocumentRef.current = updateDocument;
   }, [updateDocument]);
 
-  const editor = useEditor({
-    extensions: [StarterKit],
-    content: emptyContent,
-    onUpdate: ({ editor: editorInstance }) => {
-      const currentDocument = documentRef.current;
-      if (!currentDocument) {
-        return;
-      }
-
-      const nextContent = editorInstance.getJSON() as JSONContent;
-      updateDocumentRef.current({
-        ...currentDocument,
-        content: nextContent as Record<string, unknown>,
-        updatedAt: new Date().toISOString()
-      });
-    }
-  });
-
-  useEffect(() => {
-    if (!editor || !document) {
+  const handleContentChange = useCallback((nextContent: JSONContent) => {
+    const currentDocument = documentRef.current;
+    if (!currentDocument) {
       return;
     }
 
-    if (lastLoadedId.current === document.id) {
-      return;
-    }
+    updateDocumentRef.current({
+      ...currentDocument,
+      content: nextContent as Record<string, unknown>,
+      updatedAt: new Date().toISOString()
+    });
+  }, []);
 
-    const safeContent = sanitizeTipTapContent(document.content ?? emptyContent);
-    editor.commands.setContent(safeContent, false);
-    editor.setEditable(true);
-    editor.commands.focus("end");
-    lastLoadedId.current = document.id;
-  }, [editor, document]);
-
-  useEffect(() => {
-    if (editor) {
-      editor.setEditable(Boolean(document) && !loading);
-    }
-  }, [editor, document, loading]);
+  const documentId = document?.id ?? id ?? null;
+  const editorContent = (document?.content as JSONContent) ?? emptyContent;
+  const isEditable = Boolean(document) && !loading && !error;
 
   return (
     <div className="editor-view bg-background-light text-[#0d0e1b] dark:bg-background-dark dark:text-[#f8f8fc] font-['Inter',_sans-serif]">
