@@ -12,6 +12,11 @@ import { canEditDocument, getDocumentRole } from "../services/permission.service
 
 export const documentRoutes = Router();
 
+const DEFAULT_DOCUMENT_CONTENT = {
+  type: "doc",
+  content: [{ type: "paragraph" }]
+};
+
 documentRoutes.use(authMiddleware);
 
 documentRoutes.get("/", async (req: AuthenticatedRequest, res, next) => {
@@ -44,11 +49,15 @@ documentRoutes.post("/", async (req: AuthenticatedRequest, res, next) => {
       return;
     }
 
+    // Note: We don't check permissions here because the user is creating a NEW document.
+    // The document service will automatically add them as the owner in document_members.
+    // Permission checks will happen when they try to GET, PATCH, or DELETE the document.
+
     const documentId = typeof id === "string" && id.trim().length > 0 ? id.trim() : randomUUID();
     const document: DocumentModel = {
       id: documentId,
       title: title?.trim() || "Untitled document",
-      content: content ?? { type: "doc", content: [] },
+      content: content ?? DEFAULT_DOCUMENT_CONTENT,
       updatedAt: new Date().toISOString(),
       ownerId: req.user?.id ?? "",
       workspaceId

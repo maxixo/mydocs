@@ -166,11 +166,12 @@ export const updateDocument = async (payload: {
   const idParam = addParam(payload.id);
   const titleParam = addParam(payload.title ?? null);
   const contentParam = addParam(payload.content ? JSON.stringify(payload.content) : null);
-  const workspaceParam = addParam(payload.workspaceId);
-
-  const contentExpression =
-    schema.contentType === "jsonb" ? `${contentParam}::jsonb` : contentParam;
-  const workspaceClause = schema.hasWorkspaceId ? `AND workspace_id = ${workspaceParam}` : "";
+  const contentExpression = schema.contentType === "jsonb" ? `${contentParam}::jsonb` : contentParam;
+  let workspaceClause = "";
+  if (schema.hasWorkspaceId) {
+    const workspaceParam = addParam(payload.workspaceId);
+    workspaceClause = `AND workspace_id = ${workspaceParam}`;
+  }
   const returningFields = schema.hasWorkspaceId
     ? "id, title, content, updated_at, owner_id, workspace_id"
     : "id, title, content, updated_at, owner_id";

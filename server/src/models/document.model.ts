@@ -12,6 +12,11 @@ export interface DocumentModel extends DocumentSummary {
   content: TipTapContent;
 }
 
+const DEFAULT_DOCUMENT_CONTENT: TipTapContent = {
+  type: "doc",
+  content: [{ type: "paragraph" }]
+};
+
 const parseUpdatedAt = (row: Record<string, unknown>) => {
   if (typeof row.updatedAt === "string") {
     return row.updatedAt;
@@ -39,7 +44,7 @@ const parseContent = (value: unknown): TipTapContent => {
       // fall through to default
     }
   }
-  return { type: "doc", content: [] };
+  return DEFAULT_DOCUMENT_CONTENT;
 };
 
 export const mapDocumentSummaryRow = (_row: unknown): DocumentSummary => {
