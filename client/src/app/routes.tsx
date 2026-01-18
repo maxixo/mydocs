@@ -1,5 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
-import App from "./App";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { SignIn } from "../pages/SignIn";
 import { SignUp } from "../pages/SignUp";
@@ -10,17 +9,26 @@ export const router = createBrowserRouter([
   {
     path: "/",
     element: (
-      // <ProtectedRoute>
-        <App />
+      <ProtectedRoute>
+        <Navigate to="/editor" replace />
+      </ProtectedRoute>
     )
   },
   {
     path: "/editor",
-    element: <Editor />
+    element: (
+      <ProtectedRoute>
+        <Editor />
+      </ProtectedRoute>
+    )
   },
   {
     path: "/editor/recent",
-    element: <Recent />
+    element: (
+      <ProtectedRoute>
+        <Recent />
+      </ProtectedRoute>
+    )
   },
   {
     path: "/auth/sign-in",
@@ -31,5 +39,3 @@ export const router = createBrowserRouter([
     element: <SignUp />
   }
 ]);
-
-// TODO: Add protected document routes and auth guards.
