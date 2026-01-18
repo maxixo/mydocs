@@ -276,3 +276,18 @@ body {
     opacity: 0.5;
   }
 }
+
+.tiptap {
+  min-height: 520px;
+  outline: none;
+}
+
+.tiptap p {
+  margin: 0 0 1rem;
+}
+
+.tiptap ul,
+.tiptap ol {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+}

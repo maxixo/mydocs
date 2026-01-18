@@ -1,8 +1,70 @@
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { EditorContent, useEditor } from "@tiptap/react";
+import type { JSONContent } from "@tiptap/core";
+import StarterKit from "@tiptap/starter-kit";
+import { useDocument } from "../hooks/useDocument";
 
 export const Editor = () => {
+  const emptyContent: JSONContent = {
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text: "" }] }]
+  };
   const { id } = useParams<{ id: string }>();
-  const docTitle = id ? id.replace(/-/g, " ") : "Untitled document";
+  const [searchParams] = useSearchParams();
+  const workspaceId = searchParams.get("workspaceId") ?? "default";
+  const { document, updateDocument, loading, error } = useDocument(id, workspaceId);
+  const lastLoadedId = useRef<string | null>(null);
+  const documentRef = useRef(document);
+  const updateDocumentRef = useRef(updateDocument);
+  const fallbackTitle = id ? id.replace(/-/g, " ") : "Untitled document";
+  const docTitle = document?.title ?? fallbackTitle;
+
+  useEffect(() => {
+    documentRef.current = document;
+  }, [document]);
+
+  useEffect(() => {
+    updateDocumentRef.current = updateDocument;
+  }, [updateDocument]);
+
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content: emptyContent,
+    onUpdate: ({ editor: editorInstance }) => {
+      const currentDocument = documentRef.current;
+      if (!currentDocument) {
+        return;
+      }
+
+      const nextContent = editorInstance.getJSON() as JSONContent;
+      updateDocumentRef.current({
+        ...currentDocument,
+        content: nextContent as Record<string, unknown>,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  });
+
+  useEffect(() => {
+    if (!editor || !document) {
+      return;
+    }
+
+    if (lastLoadedId.current === document.id) {
+      return;
+    }
+
+    editor.commands.setContent((document.content ?? emptyContent) as JSONContent, false);
+    editor.setEditable(true);
+    lastLoadedId.current = document.id;
+  }, [editor, document]);
+
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(Boolean(document) && !loading);
+    }
+  }, [editor, document, loading]);
 
   return (
     <div className="editor-view bg-background-light text-[#0d0e1b] dark:bg-background-dark dark:text-[#f8f8fc] font-['Inter',_sans-serif]">
@@ -147,7 +209,7 @@ export const Editor = () => {
                         "url('https://lh3.googleusercontent.com/aida-public/AB6AXuC4s-GGjXk6BbIxNjarp3fAtcQxTDn2H1R-Dl-nRDqNoN8FFHWkiDGydIcvesiCRkb3ND33lewAAzqTY97OT-Un46I1H2mOjeIsyojoszgg-Ef5FFbQndGN18z7TntUpu0AOLmeBaIKUvVpyQrKFhc_tvu4AktGZR5jJA45bdQsImtIYsArg6LBESCqvFBJ8dIbzd-bJvUnvE0l_fqXmDkst7ijTHtRprL1CmLQnp8cxYR6OEU1fy5dKd17NwARiL0b801pxCyvOg')"
                     }}
                   ></div>
-                  <div className="inline-block flex h-8 w-8 items-center justify-center rounded-full bg-[#e7e7f3] text-[10px] font-bold text-[#4c4d9a] ring-2 ring-white dark:bg-[#1c1d3a] dark:ring-background-dark">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e7e7f3] text-[10px] font-bold text-[#4c4d9a] ring-2 ring-white dark:bg-[#1c1d3a] dark:ring-background-dark">
                     +2
                   </div>
                 </div>
@@ -220,54 +282,13 @@ export const Editor = () => {
 
               <article className="max-w-none">
                 <h1 className="mb-8 text-4xl font-bold capitalize text-[#0d0e1b] dark:text-white">{docTitle}</h1>
-                <p className="mb-8 text-lg leading-relaxed text-[#4c4d9a] dark:text-[#8a8bbd]">
-                  This document outlines the core strategic pillars for our product development lifecycle in the coming
-                  year. Our focus is on high-performance collaboration and AI-driven workflow optimization.
-                </p>
-                <h3 className="mb-4 mt-12 text-xl font-bold text-[#0d0e1b] dark:text-white">1. Vision & Goals</h3>
-                <p className="mb-6 text-base leading-relaxed text-[#4c4d9a] dark:text-[#8a8bbd]">
-                  To become the central operating system for high-output engineering teams. We aim to reduce context
-                  switching by 40% and increase sprint velocity through integrated documentation and task management.
-                </p>
-                <div className="my-8 rounded-xl border-l-4 border-primary bg-primary/5 p-6">
-                  <p className="italic text-[#0d0e1b] dark:text-white">
-                    <span className="bg-primary/20 px-1">
-                      "The best way to predict the future is to create it."
-                    </span>{" "}
-                    Let's ensure our roadmap reflects this ambition.
-                  </p>
-                </div>
-                <h3 className="mb-4 mt-12 text-xl font-bold text-[#0d0e1b] dark:text-white">
-                  2. Key Objectives (KRs)
-                </h3>
-                <ul className="space-y-4">
-                  <li className="flex items-start gap-3 text-[#4c4d9a] dark:text-[#8a8bbd]">
-                    <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded bg-primary/20 text-xs font-bold text-primary">
-                      01
-                    </span>
-                    <span>Achieve 500ms latency for real-time collaboration across 10+ regions.</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-[#4c4d9a] dark:text-[#8a8bbd]">
-                    <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded bg-primary/20 text-xs font-bold text-primary">
-                      02
-                    </span>
-                    <span>Launch the "AI Scribe" feature to automate meeting documentation by Q2.</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-[#4c4d9a] dark:text-[#8a8bbd]">
-                    <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded bg-primary/20 text-xs font-bold text-primary">
-                      03
-                    </span>
-                    <span>Reach 100k active monthly contributors on the enterprise tier.</span>
-                  </li>
-                </ul>
-                <h3 className="mb-4 mt-12 text-xl font-bold text-[#0d0e1b] dark:text-white">
-                  3. Infrastructure Roadmap
-                </h3>
-                <p className="text-base leading-relaxed text-[#4c4d9a] dark:text-[#8a8bbd]">
-                  We are transitioning our backend to a global CRDT architecture to ensure offline-first capabilities
-                  and conflict-free editing. This will involve migrating the current WebSocket layer to a decentralized
-                  edge network.
-                </p>
+                {loading ? (
+                  <p className="text-base text-[#4c4d9a] dark:text-[#8a8bbd]">Loading document...</p>
+                ) : error ? (
+                  <p className="text-base text-red-500">{error}</p>
+                ) : (
+                  <EditorContent editor={editor} className="tiptap text-lg leading-relaxed" />
+                )}
               </article>
 
               <div className="absolute left-[100px] top-[420px] -z-0 h-6 w-32 border-l-2 border-purple-500 bg-purple-500/10"></div>
