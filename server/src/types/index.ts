@@ -12,7 +12,10 @@ export interface UserRecord {
 export interface DocumentRecord {
   id: string;
   title: string;
-  content: string;
+  content: Record<string, unknown>;
+  updatedAt: string;
+  ownerId: string;
+  workspaceId: string;
 }
 
 // TODO: Add shared payload types for API and WebSocket events.

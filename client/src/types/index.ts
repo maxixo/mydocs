@@ -1,7 +1,12 @@
+export type TipTapContent = Record<string, unknown>;
+
 export interface DocumentState {
   id: string;
   title: string;
   updatedAt: string;
+  ownerId: string;
+  workspaceId: string;
+  content: TipTapContent;
 }
 
 export interface UserProfile {

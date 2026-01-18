@@ -1,6 +1,9 @@
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 export const Editor = () => {
+  const { id } = useParams<{ id: string }>();
+  const docTitle = id ? id.replace(/-/g, " ") : "Untitled document";
+
   return (
     <div className="editor-view bg-background-light text-[#0d0e1b] dark:bg-background-dark dark:text-[#f8f8fc] font-['Inter',_sans-serif]">
       <div className="flex h-screen overflow-hidden">
@@ -108,13 +111,13 @@ export const Editor = () => {
           <header className="z-20 flex h-16 items-center justify-between border-b border-[#e7e7f3] bg-white/80 px-8 backdrop-blur-md dark:border-[#2d2e4a] dark:bg-background-dark/80">
             <div className="flex flex-col">
               <div className="mb-0.5 flex items-center gap-1.5 text-xs font-medium text-[#4c4d9a]">
-                <a className="transition-colors hover:text-primary" href="#">
+                <Link className="transition-colors hover:text-primary" to="/editor/recent">
                   Docs
-                </a>
+                </Link>
                 <span>/</span>
-                <span className="text-[#0d0e1b] dark:text-[#f8f8fc]">Strategy</span>
+                <span className="text-[#0d0e1b] capitalize dark:text-[#f8f8fc]">{docTitle}</span>
               </div>
-              <h2 className="text-base font-bold text-[#0d0e1b] dark:text-white">Product Strategy 2024</h2>
+              <h2 className="text-base font-bold text-[#0d0e1b] capitalize dark:text-white">{docTitle}</h2>
             </div>
 
             <div className="flex items-center gap-6">
@@ -216,7 +219,7 @@ export const Editor = () => {
               ></div>
 
               <article className="max-w-none">
-                <h1 className="mb-8 text-4xl font-bold text-[#0d0e1b] dark:text-white">Product Strategy 2024</h1>
+                <h1 className="mb-8 text-4xl font-bold capitalize text-[#0d0e1b] dark:text-white">{docTitle}</h1>
                 <p className="mb-8 text-lg leading-relaxed text-[#4c4d9a] dark:text-[#8a8bbd]">
                   This document outlines the core strategic pillars for our product development lifecycle in the coming
                   year. Our focus is on high-performance collaboration and AI-driven workflow optimization.

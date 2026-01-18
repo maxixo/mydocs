@@ -3,11 +3,21 @@ export interface SharedUser {
   displayName: string;
 }
 
-export interface SharedDocument {
+export type TipTapContent = Record<string, unknown>;
+
+export interface DocumentSummary {
   id: string;
   title: string;
   updatedAt: string;
+  ownerId: string;
+  workspaceId: string;
 }
+
+export interface DocumentDetail extends DocumentSummary {
+  content: TipTapContent;
+}
+
+export type SharedDocument = DocumentSummary;
 
 export interface PresenceState {
   userId: string;
@@ -15,4 +25,44 @@ export interface PresenceState {
   selection: { anchor: number; head: number } | null;
 }
 
-// TODO: Add shared payload types for WebSocket messages.
+export interface DocumentIdentity {
+  documentId: string;
+  workspaceId: string;
+}
+
+export interface ClientConnectPayload {
+  userId: string;
+}
+
+export interface ClientSyncRequestPayload extends DocumentIdentity {}
+
+export interface ClientPresenceUpdatePayload extends DocumentIdentity {
+  presence: PresenceState;
+}
+
+export interface ClientDocumentOpenPayload extends DocumentIdentity {}
+
+export interface ClientDocumentMetadataUpdatePayload extends DocumentIdentity {
+  title: string;
+}
+
+export interface ServerReadyPayload {
+  serverTime: string;
+}
+
+export interface ServerSyncResponsePayload {
+  document: DocumentDetail;
+}
+
+export interface ServerPresenceBroadcastPayload extends DocumentIdentity {
+  presence: PresenceState;
+}
+
+export interface ServerErrorPayload {
+  message: string;
+  code?: string;
+}
+
+export interface ServerAccessDeniedPayload extends DocumentIdentity {
+  reason: string;
+}

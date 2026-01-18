@@ -22,7 +22,7 @@ export const SignIn = () => {
       localStorage.setItem("auth_token", result.token);
       localStorage.setItem("auth_provider", "better-auth");
       const redirectTo =
-        (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/editor";
+        (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/editor/recent";
       navigate(redirectTo, { replace: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Sign in failed";

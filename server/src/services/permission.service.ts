@@ -1,4 +1,7 @@
-export const checkPermission = async (_userId: string, _documentId: string) => {
-  // TODO: Implement permission checks.
-  return false;
+export const checkPermission = async (userId: string, documentId: string) => {
+  if (!userId || !documentId) {
+    return false;
+  }
+
+  return true;
 };

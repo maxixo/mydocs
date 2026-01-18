@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 export const Recent = () => {
   return (
     <div className="bg-background-light text-[#0d0e1b] dark:bg-background-dark dark:text-[#f8f8fc] font-['Inter',_sans-serif]">
@@ -128,62 +130,94 @@ export const Recent = () => {
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              <div className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]">
+              <Link
+                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
+                to="/editor/strategy-2024"
+                aria-label="Open Product Strategy 2024"
+              >
                 <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 <div className="flex flex-col gap-2">
                   <div className="skeleton-shimmer h-5 w-3/4 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                   <div className="skeleton-shimmer h-3 w-1/2 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 </div>
-              </div>
-              <div className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]">
+              </Link>
+              <Link
+                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
+                to="/editor/q4-roadmap-2023"
+                aria-label="Open Q4 Roadmap 2023"
+              >
                 <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 <div className="flex flex-col gap-2">
                   <div className="skeleton-shimmer h-5 w-2/3 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                   <div className="skeleton-shimmer h-3 w-1/3 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 </div>
-              </div>
-              <div className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]">
+              </Link>
+              <Link
+                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
+                to="/editor/kickoff-notes"
+                aria-label="Open Meeting Notes Kickoff"
+              >
                 <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 <div className="flex flex-col gap-2">
                   <div className="skeleton-shimmer h-5 w-4/5 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                   <div className="skeleton-shimmer h-3 w-2/5 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 </div>
-              </div>
-              <div className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]">
+              </Link>
+              <Link
+                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
+                to="/editor/team-onboarding"
+                aria-label="Open Team Onboarding"
+              >
                 <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 <div className="flex flex-col gap-2">
                   <div className="skeleton-shimmer h-5 w-1/2 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                   <div className="skeleton-shimmer h-3 w-1/4 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 </div>
-              </div>
-              <div className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]">
+              </Link>
+              <Link
+                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
+                to="/editor/design-system"
+                aria-label="Open Design System"
+              >
                 <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 <div className="flex flex-col gap-2">
                   <div className="skeleton-shimmer h-5 w-3/5 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                   <div className="skeleton-shimmer h-3 w-1/3 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 </div>
-              </div>
-              <div className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]">
+              </Link>
+              <Link
+                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
+                to="/editor/marketing-plan"
+                aria-label="Open Marketing Plan"
+              >
                 <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 <div className="flex flex-col gap-2">
                   <div className="skeleton-shimmer h-5 w-3/4 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                   <div className="skeleton-shimmer h-3 w-1/2 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 </div>
-              </div>
-              <div className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]">
+              </Link>
+              <Link
+                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
+                to="/editor/release-notes"
+                aria-label="Open Release Notes"
+              >
                 <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 <div className="flex flex-col gap-2">
                   <div className="skeleton-shimmer h-5 w-2/3 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                   <div className="skeleton-shimmer h-3 w-1/3 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 </div>
-              </div>
-              <div className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]">
+              </Link>
+              <Link
+                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
+                to="/editor/retrospective"
+                aria-label="Open Retrospective"
+              >
                 <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 <div className="flex flex-col gap-2">
                   <div className="skeleton-shimmer h-5 w-4/5 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                   <div className="skeleton-shimmer h-3 w-2/5 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
                 </div>
-              </div>
+              </Link>
             </div>
           </div>
         </main>
