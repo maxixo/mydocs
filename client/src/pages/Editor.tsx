@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { JSONContent } from "@tiptap/core";
 import { EditorSurface } from "../editor/Editor";
 import { useDocument } from "../hooks/useDocument";
 import { EMPTY_TIPTAP_DOC } from "../utils/tiptapContent";
+import { connectWebSocket, type WebSocketManager } from "../websocket/socket.js";
+import { ClientEvent } from "@shared/events";
+import type { ServerSyncResponsePayload, ServerPresenceBroadcastPayload } from "@shared/types";
 
 export const Editor = () => {
   const emptyContent: JSONContent = EMPTY_TIPTAP_DOC;
@@ -40,6 +43,59 @@ export const Editor = () => {
   const documentId = document?.id ?? id ?? null;
   const editorContent = (document?.content as JSONContent) ?? emptyContent;
   const isEditable = Boolean(document) && !loading && !error;
+
+  // WebSocket and collaboration state
+  const wsManagerRef = useRef<WebSocketManager | null>(null);
+
+  // Initialize WebSocket connection for collaboration
+  useEffect(() => {
+    if (!documentId) return;
+
+    // Get WebSocket URL from environment or use default
+    const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.host}/ws`;
+
+    // Connect to WebSocket with event handlers
+    const manager = connectWebSocket(wsUrl, {
+      onReady: (payload) => {
+        console.log("WebSocket ready:", payload);
+      },
+      onSyncResponse: (payload: ServerSyncResponsePayload) => {
+        console.log("Document synced:", payload.document);
+      },
+      onPresenceBroadcast: (payload: ServerPresenceBroadcastPayload) => {
+        console.log("Presence update:", payload.presence);
+      },
+      onError: (payload) => {
+        console.error("WebSocket error:", payload);
+      }
+    });
+
+    wsManagerRef.current = manager;
+
+    // Join document room when connected
+    const checkConnection = setInterval(() => {
+      if (manager.isConnected() && documentId && workspaceId) {
+        manager.send(ClientEvent.DocumentOpen, {
+          documentId,
+          workspaceId
+        });
+        clearInterval(checkConnection);
+      }
+    }, 100);
+
+    return () => {
+      clearInterval(checkConnection);
+    };
+  }, [documentId, workspaceId]);
+
+  // Cleanup WebSocket on unmount
+  useEffect(() => {
+    return () => {
+      if (wsManagerRef.current) {
+        wsManagerRef.current.disconnect();
+      }
+    };
+  }, []);
 
   return (
     <div className="editor-view bg-background-light text-[#0d0e1b] dark:bg-background-dark dark:text-[#f8f8fc] font-['Inter',_sans-serif]">

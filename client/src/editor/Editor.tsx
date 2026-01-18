@@ -3,7 +3,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import type { JSONContent } from "@tiptap/core";
 import { createEditorExtensions } from "./editorConfig";
 import { Toolbar } from "./Toolbar";
-import { createYjsProvider } from "../collaboration/yjsProvider";
+import { getYjsProvider } from "../collaboration/yjsProvider";
 import { createSyncManager } from "../collaboration/syncManager";
 import { EMPTY_TIPTAP_DOC, sanitizeTipTapContent } from "../utils/tiptapContent";
 
@@ -32,12 +32,27 @@ export const EditorSurface = ({
   loading = false,
   error = null
 }: EditorSurfaceProps) => {
-  const provider = useMemo(() => createYjsProvider(), [documentId]);
+  const provider = useMemo(() => {
+    // Note: Y.js provider requires documentId, wsUrl, and wsManager
+    // For now, we'll create a basic provider structure
+    // TODO: Integrate with WebSocket manager when collaboration is fully implemented
+    if (!documentId) return null;
+    
+    // This is a simplified version - full implementation would pass wsUrl and wsManager
+    const mockWsManager = {
+      send: () => {},
+      disconnect: () => {},
+      isConnected: () => false
+    } as any;
+    
+    return getYjsProvider(documentId, "", mockWsManager);
+  }, [documentId]);
+  
   const syncManager = useMemo(
     () =>
-      createSyncManager(provider, {
+      provider ? createSyncManager(provider, {
         user: DEFAULT_USER
-      }),
+      }) : null,
     [provider]
   );
   const onChangeRef = useRef(onChange);

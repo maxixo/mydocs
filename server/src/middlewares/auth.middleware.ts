@@ -29,7 +29,7 @@ type SessionPayload = {
   };
 };
 
-const getSessionUser = async (req: Request) => {
+export const getSessionUser = async (req: Request) => {
   const baseUrl = env.authBaseUrl || `${req.protocol}://${req.get("host")}`;
   const url = new URL("/api/auth/get-session", baseUrl);
   const headers = new Headers();
