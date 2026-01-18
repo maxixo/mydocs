@@ -4,12 +4,10 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import type { JSONContent } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { useDocument } from "../hooks/useDocument";
+import { EMPTY_TIPTAP_DOC, sanitizeTipTapContent } from "../utils/tiptapContent";
 
 export const Editor = () => {
-  const emptyContent: JSONContent = {
-    type: "doc",
-    content: [{ type: "paragraph", content: [{ type: "text", text: "" }] }]
-  };
+  const emptyContent: JSONContent = EMPTY_TIPTAP_DOC;
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const workspaceId = searchParams.get("workspaceId") ?? "default";
@@ -55,8 +53,10 @@ export const Editor = () => {
       return;
     }
 
-    editor.commands.setContent((document.content ?? emptyContent) as JSONContent, false);
+    const safeContent = sanitizeTipTapContent(document.content ?? emptyContent);
+    editor.commands.setContent(safeContent, false);
     editor.setEditable(true);
+    editor.commands.focus("end");
     lastLoadedId.current = document.id;
   }, [editor, document]);
 

@@ -7,7 +7,9 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "migrations:run": "tsx src/server.ts",
+    "migrations:status": "tsx scripts/run-migrations.ts status"
   },
   "dependencies": {
     "better-auth": "^1.4.13",

@@ -53,6 +53,7 @@ export const fetchDocumentById = async (
 };
 
 export const createDocument = async (payload: {
+  id?: string;
   title?: string;
   content?: TipTapContent;
   workspaceId: string;

@@ -32,7 +32,8 @@ documentRoutes.get("/", async (req: AuthenticatedRequest, res, next) => {
 
 documentRoutes.post("/", async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { title, content, workspaceId } = req.body as {
+    const { id, title, content, workspaceId } = req.body as {
+      id?: string;
       title?: string;
       content?: Record<string, unknown>;
       workspaceId?: string;
@@ -43,8 +44,9 @@ documentRoutes.post("/", async (req: AuthenticatedRequest, res, next) => {
       return;
     }
 
+    const documentId = typeof id === "string" && id.trim().length > 0 ? id.trim() : randomUUID();
     const document: DocumentModel = {
-      id: randomUUID(),
+      id: documentId,
       title: title?.trim() || "Untitled document",
       content: content ?? { type: "doc", content: [] },
       updatedAt: new Date().toISOString(),
@@ -52,8 +54,17 @@ documentRoutes.post("/", async (req: AuthenticatedRequest, res, next) => {
       workspaceId
     };
 
-    const createdDocument = await createDocument(document);
-    res.status(201).json({ document: createdDocument });
+    try {
+      const createdDocument = await createDocument(document);
+      res.status(201).json({ document: createdDocument });
+    } catch (error) {
+      const err = error as { code?: string };
+      if (err.code === "23505") {
+        res.status(409).json({ message: "Document already exists" });
+        return;
+      }
+      throw error;
+    }
   } catch (error) {
     next(error);
   }

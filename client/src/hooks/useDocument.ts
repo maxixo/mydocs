@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DocumentState } from "../types";
-import { fetchDocumentById, updateDocument } from "../services/document.service";
+import { createDocument, fetchDocumentById, updateDocument } from "../services/document.service";
 import { debounce } from "../utils/debounce";
+import { EMPTY_TIPTAP_DOC, sanitizeTipTapContent } from "../utils/tiptapContent";
 
 const DEFAULT_AUTOSAVE_MS = 1200;
+const EMPTY_CONTENT = EMPTY_TIPTAP_DOC;
 
 export const useDocument = (documentId?: string, workspaceId?: string) => {
   const [document, setDocument] = useState<DocumentState | null>(null);
@@ -28,12 +30,27 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
         }
 
         if (!result) {
-          setError("Document not found");
-          setDocument(null);
+          const fallbackTitle = documentId.replace(/-/g, " ");
+          const created = await createDocument({
+            id: documentId,
+            title: fallbackTitle || "Untitled document",
+            content: EMPTY_CONTENT,
+            workspaceId
+          });
+          if (!isMounted) {
+            return;
+          }
+          setDocument({
+            ...created,
+            content: sanitizeTipTapContent(created.content) as DocumentState["content"]
+          });
           return;
         }
 
-        setDocument(result);
+        setDocument({
+          ...result,
+          content: sanitizeTipTapContent(result.content) as DocumentState["content"]
+        });
       } catch (err) {
         if (isMounted) {
           setError(err instanceof Error ? err.message : "Failed to load document");
@@ -52,8 +69,8 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
     };
   }, [documentId, workspaceId]);
 
-  const debouncedPersist = useMemo(() => {
-    return debounce(async (next: DocumentState) => {
+  const persistDocument = useCallback(
+    async (next: DocumentState) => {
       if (!documentId || !workspaceId) {
         return;
       }
@@ -68,8 +85,15 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to save document");
       }
+    },
+    [documentId, workspaceId]
+  );
+
+  const debouncedPersist = useMemo(() => {
+    return debounce((next: DocumentState) => {
+      void persistDocument(next);
     }, DEFAULT_AUTOSAVE_MS);
-  }, [documentId, workspaceId]);
+  }, [persistDocument]);
 
   const updateDocumentState = useCallback(
     (next: DocumentState) => {

@@ -1,10 +1,10 @@
-export const debounce = <T extends (...args: unknown[]) => void>(
-  fn: T,
+export const debounce = <Args extends unknown[]>(
+  fn: (...args: Args) => void,
   delayMs: number
 ) => {
-  let timeoutId: number | undefined;
+  let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
 
-  return (...args: Parameters<T>) => {
+  return (...args: Args) => {
     window.clearTimeout(timeoutId);
     timeoutId = window.setTimeout(() => fn(...args), delayMs);
   };

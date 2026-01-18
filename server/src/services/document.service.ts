@@ -1,23 +1,46 @@
 import { db } from "../config/db.js";
 import type { DocumentModel, DocumentSummary, TipTapContent } from "../models/document.model.js";
 import { mapDocumentRow, mapDocumentSummaryRow } from "../models/document.model.js";
+import { getDocumentSchemaInfo } from "./documentSchema.service.js";
+
+const createParamBuilder = () => {
+  const params: Array<unknown> = [];
+  const addParam = <T>(value: T) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+
+  return { params, addParam };
+};
 
 export const listDocuments = async (
   workspaceId: string,
   userId: string
 ): Promise<DocumentSummary[]> => {
+  const schema = await getDocumentSchemaInfo();
+  const { params, addParam } = createParamBuilder();
+  const userParam = addParam(userId);
+  const workspaceParam = addParam(workspaceId);
+
+  const joinClause = schema.hasDocumentMembers
+    ? `LEFT JOIN document_members m ON d.id = m.document_id AND m.user_id = ${userParam}`
+    : "";
+  const visibilityClause = schema.hasDocumentMembers
+    ? `(d.owner_id = ${userParam} OR m.user_id = ${userParam})`
+    : `d.owner_id = ${userParam}`;
+  const workspaceClause = schema.hasWorkspaceId ? `AND d.workspace_id = ${workspaceParam}` : "";
+  const workspaceSelect = schema.hasWorkspaceId ? "d.workspace_id" : `${workspaceParam} AS workspace_id`;
+
   const { rows } = await db.query(
     `
-      SELECT d.id, d.title, d.updated_at, d.owner_id, d.workspace_id
+      SELECT d.id, d.title, d.updated_at, d.owner_id, ${workspaceSelect}
       FROM documents d
-      LEFT JOIN document_members m
-        ON d.id = m.document_id
-        AND m.user_id = $2
-      WHERE d.workspace_id = $1
-        AND (d.owner_id = $2 OR m.user_id = $2)
+      ${joinClause}
+      WHERE ${visibilityClause}
+      ${workspaceClause}
       ORDER BY d.updated_at DESC
     `,
-    [workspaceId, userId]
+    params
   );
 
   return rows.map(mapDocumentSummaryRow);
@@ -28,19 +51,32 @@ export const getDocumentById = async (
   workspaceId: string,
   userId: string
 ): Promise<DocumentModel | null> => {
+  const schema = await getDocumentSchemaInfo();
+  const { params, addParam } = createParamBuilder();
+  const idParam = addParam(id);
+  const userParam = addParam(userId);
+  const workspaceParam = addParam(workspaceId);
+
+  const joinClause = schema.hasDocumentMembers
+    ? `LEFT JOIN document_members m ON d.id = m.document_id AND m.user_id = ${userParam}`
+    : "";
+  const visibilityClause = schema.hasDocumentMembers
+    ? `(d.owner_id = ${userParam} OR m.user_id = ${userParam})`
+    : `d.owner_id = ${userParam}`;
+  const workspaceClause = schema.hasWorkspaceId ? `AND d.workspace_id = ${workspaceParam}` : "";
+  const workspaceSelect = schema.hasWorkspaceId ? "d.workspace_id" : `${workspaceParam} AS workspace_id`;
+
   const { rows } = await db.query(
     `
-      SELECT d.id, d.title, d.content, d.updated_at, d.owner_id, d.workspace_id
+      SELECT d.id, d.title, d.content, d.updated_at, d.owner_id, ${workspaceSelect}
       FROM documents d
-      LEFT JOIN document_members m
-        ON d.id = m.document_id
-        AND m.user_id = $2
-      WHERE d.id = $1
-        AND d.workspace_id = $3
-        AND (d.owner_id = $2 OR m.user_id = $2)
+      ${joinClause}
+      WHERE d.id = ${idParam}
+        AND ${visibilityClause}
+      ${workspaceClause}
       LIMIT 1
     `,
-    [id, userId, workspaceId]
+    params
   );
 
   if (rows.length === 0) {
@@ -57,29 +93,60 @@ export const createDocument = async (payload: {
   ownerId: string;
   workspaceId: string;
 }): Promise<DocumentModel> => {
+  const schema = await getDocumentSchemaInfo();
   const client = await db.connect();
   try {
     await client.query("BEGIN");
+    const { params, addParam } = createParamBuilder();
+    const columns: string[] = [];
+    const values: string[] = [];
+
+    const addColumn = (name: string, value: unknown, cast?: string) => {
+      columns.push(name);
+      const param = addParam(value);
+      values.push(cast ? `${param}::${cast}` : param);
+    };
+
+    addColumn("id", payload.id);
+    addColumn("title", payload.title);
+    addColumn("content", JSON.stringify(payload.content), schema.contentType === "jsonb" ? "jsonb" : undefined);
+    addColumn("owner_id", payload.ownerId);
+    if (schema.hasWorkspaceId) {
+      addColumn("workspace_id", payload.workspaceId);
+    }
+    columns.push("updated_at");
+    values.push("NOW()");
+
+    const returningFields = schema.hasWorkspaceId
+      ? "id, title, content, updated_at, owner_id, workspace_id"
+      : "id, title, content, updated_at, owner_id";
+
     const { rows } = await client.query(
       `
-        INSERT INTO documents (id, title, content, owner_id, workspace_id, updated_at)
-        VALUES ($1, $2, $3::jsonb, $4, $5, NOW())
-        RETURNING id, title, content, updated_at, owner_id, workspace_id
+        INSERT INTO documents (${columns.join(", ")})
+        VALUES (${values.join(", ")})
+        RETURNING ${returningFields}
       `,
-      [payload.id, payload.title, JSON.stringify(payload.content), payload.ownerId, payload.workspaceId]
+      params
     );
 
-    await client.query(
-      `
-        INSERT INTO document_members (document_id, user_id, role)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (document_id, user_id) DO NOTHING
-      `,
-      [payload.id, payload.ownerId, "owner"]
-    );
+    if (schema.hasDocumentMembers) {
+      await client.query(
+        `
+          INSERT INTO document_members (document_id, user_id, role)
+          VALUES ($1, $2, $3)
+          ON CONFLICT (document_id, user_id) DO NOTHING
+        `,
+        [payload.id, payload.ownerId, "owner"]
+      );
+    }
 
     await client.query("COMMIT");
-    return mapDocumentRow(rows[0]);
+    const document = mapDocumentRow(rows[0]);
+    if (!schema.hasWorkspaceId) {
+      document.workspaceId = payload.workspaceId;
+    }
+    return document;
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -94,27 +161,40 @@ export const updateDocument = async (payload: {
   title?: string;
   content?: TipTapContent;
 }): Promise<DocumentModel | null> => {
+  const schema = await getDocumentSchemaInfo();
+  const { params, addParam } = createParamBuilder();
+  const idParam = addParam(payload.id);
+  const titleParam = addParam(payload.title ?? null);
+  const contentParam = addParam(payload.content ? JSON.stringify(payload.content) : null);
+  const workspaceParam = addParam(payload.workspaceId);
+
+  const contentExpression =
+    schema.contentType === "jsonb" ? `${contentParam}::jsonb` : contentParam;
+  const workspaceClause = schema.hasWorkspaceId ? `AND workspace_id = ${workspaceParam}` : "";
+  const returningFields = schema.hasWorkspaceId
+    ? "id, title, content, updated_at, owner_id, workspace_id"
+    : "id, title, content, updated_at, owner_id";
+
   const { rows } = await db.query(
     `
       UPDATE documents
-      SET title = COALESCE($2, title),
-          content = COALESCE($3::jsonb, content),
+      SET title = COALESCE(${titleParam}, title),
+          content = COALESCE(${contentExpression}, content),
           updated_at = NOW()
-      WHERE id = $1
-        AND workspace_id = $4
-      RETURNING id, title, content, updated_at, owner_id, workspace_id
+      WHERE id = ${idParam}
+      ${workspaceClause}
+      RETURNING ${returningFields}
     `,
-    [
-      payload.id,
-      payload.title ?? null,
-      payload.content ? JSON.stringify(payload.content) : null,
-      payload.workspaceId
-    ]
+    params
   );
 
   if (rows.length === 0) {
     return null;
   }
 
-  return mapDocumentRow(rows[0]);
+  const document = mapDocumentRow(rows[0]);
+  if (!schema.hasWorkspaceId) {
+    document.workspaceId = payload.workspaceId;
+  }
+  return document;
 };

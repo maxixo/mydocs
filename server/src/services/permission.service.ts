@@ -1,4 +1,5 @@
 import { db } from "../config/db.js";
+import { getDocumentSchemaInfo } from "./documentSchema.service.js";
 
 export type DocumentRole = "viewer" | "editor" | "owner";
 
@@ -11,18 +12,27 @@ export const getDocumentRole = async (
     return null;
   }
 
+  const schema = await getDocumentSchemaInfo();
+  const params: Array<string> = [documentId, userId];
+  const workspaceClause = schema.hasWorkspaceId ? "AND d.workspace_id = $3" : "";
+  if (schema.hasWorkspaceId) {
+    params.push(workspaceId);
+  }
+  const joinClause = schema.hasDocumentMembers
+    ? "LEFT JOIN document_members m ON d.id = m.document_id AND m.user_id = $2"
+    : "";
+  const roleColumn = schema.hasDocumentMembers ? ", m.role" : "";
+
   const { rows } = await db.query(
     `
-      SELECT d.owner_id, m.role
+      SELECT d.owner_id${roleColumn}
       FROM documents d
-      LEFT JOIN document_members m
-        ON d.id = m.document_id
-        AND m.user_id = $2
+      ${joinClause}
       WHERE d.id = $1
-        AND d.workspace_id = $3
+      ${workspaceClause}
       LIMIT 1
     `,
-    [documentId, userId, workspaceId]
+    params
   );
 
   if (rows.length === 0) {
