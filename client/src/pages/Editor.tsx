@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { JSONContent } from "@tiptap/core";
 import { EditorSurface } from "../editor/Editor";
 import { useDocument } from "../hooks/useDocument";
@@ -13,16 +13,22 @@ export const Editor = () => {
   const emptyContent: JSONContent = EMPTY_TIPTAP_DOC;
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const workspaceId = searchParams.get("workspaceId") ?? "default";
-  const { document, updateDocument, loading, error } = useDocument(id, workspaceId);
+  const { document, updateDocument, loading, error, saveStatus } = useDocument(id, workspaceId);
   const documentRef = useRef(document);
   const updateDocumentRef = useRef(updateDocument);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [editorStats, setEditorStats] = useState({ wordCount: 0, charCount: 0 });
   const fallbackTitle = id ? id.replace(/-/g, " ") : "Untitled document";
   const docTitle = document?.title ?? fallbackTitle;
   const displayTitle = docTitle.trim().length > 0 ? docTitle : "Untitled document";
+  const shouldFocusTitle = Boolean((location.state as { focusTitle?: boolean } | null)?.focusTitle);
+  const saveLabel = saveStatus === "saving" ? "Saving..." : saveStatus === "error" ? "Error" : "Saved";
+  const saveIcon = saveStatus === "saving" ? "cloud_upload" : saveStatus === "error" ? "error" : "cloud_done";
+  const saveClass = saveStatus === "error" ? "text-red-500" : "text-[#4c4d9a]";
 
   useEffect(() => {
     documentRef.current = document;
@@ -79,7 +85,9 @@ export const Editor = () => {
         workspaceId
       });
 
-      navigate(`/editor/${encodeURIComponent(created.id)}?workspaceId=${encodeURIComponent(workspaceId)}`);
+      navigate(`/editor/${encodeURIComponent(created.id)}?workspaceId=${encodeURIComponent(workspaceId)}`, {
+        state: { focusTitle: true }
+      });
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Failed to create document");
     } finally {
@@ -330,6 +338,8 @@ export const Editor = () => {
               editable={isEditable}
               onChange={handleContentChange}
               onTitleChange={handleTitleChange}
+              onStatsChange={setEditorStats}
+              autoFocusTitle={shouldFocusTitle}
               docTitle={docTitle}
               loading={loading}
               error={error}
@@ -338,17 +348,17 @@ export const Editor = () => {
 
           <footer className="flex h-8 items-center justify-between border-t border-[#e7e7f3] bg-white px-6 text-[10px] font-medium uppercase tracking-widest text-[#4c4d9a] dark:border-[#2d2e4a] dark:bg-background-dark">
             <div className="flex items-center gap-4">
-              <span>Characters: 1,420</span>
-              <span>Words: 245</span>
+              <span>Characters: {editorStats.charCount.toLocaleString()}</span>
+              <span>Words: {editorStats.wordCount.toLocaleString()}</span>
             </div>
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500"></span>
                 Online
               </span>
-              <span className="flex items-center gap-1">
-                <span className="material-symbols-outlined !text-xs">cloud_done</span>
-                Saved
+              <span className={`flex items-center gap-1 ${saveClass}`} aria-live="polite">
+                <span className="material-symbols-outlined !text-xs">{saveIcon}</span>
+                {saveLabel}
               </span>
             </div>
           </footer>

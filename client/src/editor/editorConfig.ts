@@ -1,6 +1,7 @@
 import type { Extension } from "@tiptap/core";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
+import Link from "@tiptap/extension-link";
 import StarterKit from "@tiptap/starter-kit";
 import type { Awareness } from "y-protocols/awareness";
 import type * as Y from "yjs";
@@ -25,6 +26,11 @@ export const createEditorExtensions = (options?: {
   const extensions: Extension[] = [
     StarterKit.configure({
       history: Boolean(options?.collaboration?.doc) ? false : true
+    }),
+    Link.configure({
+      openOnClick: false,
+      linkOnPaste: true,
+      autolink: true
     })
   ];
 

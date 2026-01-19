@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DocumentState } from "../types";
 import { createDocument, fetchDocumentById, updateDocument } from "../services/document.service";
 import { debounce } from "../utils/debounce";
@@ -7,10 +7,16 @@ import { EMPTY_TIPTAP_DOC, sanitizeTipTapContent } from "../utils/tiptapContent"
 const DEFAULT_AUTOSAVE_MS = 1200;
 const EMPTY_CONTENT = EMPTY_TIPTAP_DOC;
 
+export type SaveStatus = "idle" | "saving" | "saved" | "error";
+
 export const useDocument = (documentId?: string, workspaceId?: string) => {
   const [document, setDocument] = useState<DocumentState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saveCounterRef = useRef(0);
+  const pendingSaveRef = useRef(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -22,6 +28,8 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
 
       setLoading(true);
       setError(null);
+      setSaveStatus("idle");
+      setSaveError(null);
 
       try {
         const result = await fetchDocumentById(documentId, workspaceId);
@@ -70,7 +78,7 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
   }, [documentId, workspaceId]);
 
   const persistDocument = useCallback(
-    async (next: DocumentState) => {
+    async (next: DocumentState, saveId: number) => {
       if (!documentId || !workspaceId) {
         return;
       }
@@ -82,26 +90,44 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
           title: next.title,
           content: next.content
         });
+        if (pendingSaveRef.current === saveId) {
+          setSaveStatus("saved");
+          setSaveError(null);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to save document");
+        if (pendingSaveRef.current === saveId) {
+          setSaveStatus("error");
+          setSaveError(err instanceof Error ? err.message : "Failed to save document");
+        }
       }
     },
     [documentId, workspaceId]
   );
 
   const debouncedPersist = useMemo(() => {
-    return debounce((next: DocumentState) => {
-      void persistDocument(next);
+    return debounce((next: DocumentState, saveId: number) => {
+      void persistDocument(next, saveId);
     }, DEFAULT_AUTOSAVE_MS);
   }, [persistDocument]);
 
   const updateDocumentState = useCallback(
     (next: DocumentState) => {
       setDocument(next);
-      debouncedPersist(next);
+      saveCounterRef.current += 1;
+      const saveId = saveCounterRef.current;
+      pendingSaveRef.current = saveId;
+      setSaveStatus("saving");
+      debouncedPersist(next, saveId);
     },
     [debouncedPersist]
   );
 
-  return { document, updateDocument: updateDocumentState, loading, error };
+  return {
+    document,
+    updateDocument: updateDocumentState,
+    loading,
+    error,
+    saveStatus,
+    saveError
+  };
 };
