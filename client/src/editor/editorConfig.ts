@@ -1,10 +1,10 @@
 import type { Extension } from "@tiptap/core";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
-import Link from "@tiptap/extension-link";
 import StarterKit from "@tiptap/starter-kit";
 import type { Awareness } from "y-protocols/awareness";
 import type * as Y from "yjs";
+import { Link } from "./extensions/link";
 
 export const editorConfig = {
   placeholder: "Start typing...",
@@ -25,13 +25,9 @@ export const createEditorExtensions = (options?: {
 }): Extension[] => {
   const extensions: Extension[] = [
     StarterKit.configure({
-      history: Boolean(options?.collaboration?.doc) ? false : true
+      history: options?.collaboration?.doc ? false : undefined
     }),
-    Link.configure({
-      openOnClick: false,
-      linkOnPaste: true,
-      autolink: true
-    })
+    Link as any
   ];
 
   if (options?.collaboration?.doc) {

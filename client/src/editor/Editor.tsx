@@ -18,6 +18,17 @@ type EditorStats = {
   charCount: number;
 };
 
+const getTextStats = (value: string): EditorStats => {
+  const trimmed = value.trim();
+  const wordCount = trimmed ? trimmed.split(/\s+/).length : 0;
+  return { wordCount, charCount: value.length };
+};
+
+const mergeStats = (first: EditorStats, second: EditorStats): EditorStats => ({
+  wordCount: first.wordCount + second.wordCount,
+  charCount: first.charCount + second.charCount
+});
+
 type EditorSurfaceProps = {
   documentId?: string | null;
   content: JSONContent;
@@ -76,14 +87,15 @@ export const EditorSurface = ({
     didAutoFocusRef.current = false;
   }, [documentId]);
 
-  const updateStats = useCallback((editorInstance: TipTapEditor) => {
-    const text = editorInstance.getText();
-    const trimmed = text.trim();
-    const wordCount = trimmed ? trimmed.split(/\s+/).length : 0;
-    const charCount = text.length;
-    onStatsChangeRef.current?.({ wordCount, charCount });
-    setIsEmpty(editorInstance.isEmpty);
-  }, []);
+  const updateStats = useCallback(
+    (editorInstance: TipTapEditor) => {
+      const bodyStats = getTextStats(editorInstance.getText());
+      const titleStats = getTextStats(docTitle);
+      onStatsChangeRef.current?.(mergeStats(bodyStats, titleStats));
+      setIsEmpty(editorInstance.isEmpty);
+    },
+    [docTitle]
+  );
 
   const editor = useEditor({
     extensions: createEditorExtensions(
@@ -122,6 +134,13 @@ export const EditorSurface = ({
     lastHydratedKey.current = hydrationKey;
     updateStats(editor);
   }, [editor, content, documentId, updateStats]);
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+    updateStats(editor);
+  }, [docTitle, editor, updateStats]);
 
   useEffect(() => {
     if (editor) {
@@ -172,11 +191,11 @@ export const EditorSurface = ({
 
     const trimmed = nextUrl.trim();
     if (!trimmed) {
-      editor.chain().focus().extendMarkRange("link").unsetLink().run();
+      editor.chain().focus().extendMarkRange("link").unsetMark("link").run();
       return;
     }
 
-    editor.chain().focus().extendMarkRange("link").setLink({ href: trimmed }).run();
+    editor.chain().focus().extendMarkRange("link").setMark("link", { href: trimmed }).run();
   }, [editor]);
 
   const showEmptyHint = editable && !loading && !error && isEmpty;
