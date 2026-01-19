@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { JSONContent } from "@tiptap/core";
 import { EditorSurface } from "../editor/Editor";
 import { useDocument } from "../hooks/useDocument";
+import { createDocument } from "../services/document.service";
 import { EMPTY_TIPTAP_DOC } from "../utils/tiptapContent";
 import { connectWebSocket, type WebSocketManager } from "../websocket/socket.js";
 import { ClientEvent } from "@shared/events";
@@ -11,13 +12,17 @@ import type { ServerSyncResponsePayload, ServerPresenceBroadcastPayload } from "
 export const Editor = () => {
   const emptyContent: JSONContent = EMPTY_TIPTAP_DOC;
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const workspaceId = searchParams.get("workspaceId") ?? "default";
   const { document, updateDocument, loading, error } = useDocument(id, workspaceId);
   const documentRef = useRef(document);
   const updateDocumentRef = useRef(updateDocument);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const fallbackTitle = id ? id.replace(/-/g, " ") : "Untitled document";
   const docTitle = document?.title ?? fallbackTitle;
+  const displayTitle = docTitle.trim().length > 0 ? docTitle : "Untitled document";
 
   useEffect(() => {
     documentRef.current = document;
@@ -33,12 +38,54 @@ export const Editor = () => {
       return;
     }
 
-    updateDocumentRef.current({
+    const nextDocument = {
       ...currentDocument,
       content: nextContent as Record<string, unknown>,
       updatedAt: new Date().toISOString()
-    });
+    };
+
+    documentRef.current = nextDocument;
+    updateDocumentRef.current(nextDocument);
   }, []);
+
+  const handleTitleChange = useCallback((nextTitle: string) => {
+    const currentDocument = documentRef.current;
+    if (!currentDocument) {
+      return;
+    }
+
+    const nextDocument = {
+      ...currentDocument,
+      title: nextTitle,
+      updatedAt: new Date().toISOString()
+    };
+
+    documentRef.current = nextDocument;
+    updateDocumentRef.current(nextDocument);
+  }, []);
+
+  const handleCreateDocument = useCallback(async () => {
+    if (isCreating) {
+      return;
+    }
+
+    setIsCreating(true);
+    setCreateError(null);
+
+    try {
+      const created = await createDocument({
+        title: "Untitled document",
+        content: emptyContent as Record<string, unknown>,
+        workspaceId
+      });
+
+      navigate(`/editor/${encodeURIComponent(created.id)}?workspaceId=${encodeURIComponent(workspaceId)}`);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Failed to create document");
+    } finally {
+      setIsCreating(false);
+    }
+  }, [emptyContent, isCreating, navigate, workspaceId]);
 
   const documentId = document?.id ?? id ?? null;
   const editorContent = (document?.content as JSONContent) ?? emptyContent;
@@ -107,10 +154,16 @@ export const Editor = () => {
               <p className="text-sm font-normal text-[#4c4d9a] dark:text-[#8a8bbd]">Collaborative Team</p>
             </div>
 
-            <button className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary/90">
+            <button
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+              type="button"
+              onClick={handleCreateDocument}
+              disabled={isCreating}
+            >
               <span className="material-symbols-outlined">add</span>
-              <span>New Document</span>
+              <span>{isCreating ? "Creating..." : "New Document"}</span>
             </button>
+            {createError ? <p className="text-xs text-red-500">{createError}</p> : null}
 
             <div className="relative">
               <label className="flex h-10 w-full items-center gap-2 rounded-lg border border-transparent bg-[#e7e7f3] px-3 transition-all focus-within:border-primary/50 dark:bg-[#1c1d3a]">
@@ -208,9 +261,9 @@ export const Editor = () => {
                   Docs
                 </Link>
                 <span>/</span>
-                <span className="text-[#0d0e1b] capitalize dark:text-[#f8f8fc]">{docTitle}</span>
+                <span className="text-[#0d0e1b] capitalize dark:text-[#f8f8fc]">{displayTitle}</span>
               </div>
-              <h2 className="text-base font-bold text-[#0d0e1b] capitalize dark:text-white">{docTitle}</h2>
+              <h2 className="text-base font-bold text-[#0d0e1b] capitalize dark:text-white">{displayTitle}</h2>
             </div>
 
             <div className="flex items-center gap-6">
@@ -276,6 +329,7 @@ export const Editor = () => {
               content={editorContent}
               editable={isEditable}
               onChange={handleContentChange}
+              onTitleChange={handleTitleChange}
               docTitle={docTitle}
               loading={loading}
               error={error}

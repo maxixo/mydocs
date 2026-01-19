@@ -19,6 +19,7 @@ type EditorSurfaceProps = {
   editable: boolean;
   onChange: (content: JSONContent) => void;
   docTitle: string;
+  onTitleChange: (title: string) => void;
   loading?: boolean;
   error?: string | null;
 };
@@ -28,6 +29,7 @@ export const EditorSurface = ({
   content,
   editable,
   onChange,
+  onTitleChange,
   docTitle,
   loading = false,
   error = null
@@ -126,7 +128,20 @@ export const EditorSurface = ({
         ></div>
 
         <article className="max-w-none">
-          <h1 className="mb-8 text-4xl font-bold capitalize text-[#0d0e1b] dark:text-white">{docTitle}</h1>
+          <div className="mb-8">
+            <label className="sr-only" htmlFor="document-title">
+              Document title
+            </label>
+            <input
+              id="document-title"
+              className="w-full bg-transparent text-4xl font-bold text-[#0d0e1b] placeholder:text-[#0d0e1b]/40 focus:outline-none dark:text-white dark:placeholder:text-white/40"
+              value={docTitle}
+              placeholder="Untitled document"
+              readOnly={!editable}
+              aria-disabled={!editable}
+              onChange={(event) => onTitleChange(event.target.value)}
+            />
+          </div>
           {loading ? (
             <p className="text-base text-[#4c4d9a] dark:text-[#8a8bbd]">Loading document...</p>
           ) : error ? (
