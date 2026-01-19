@@ -33,19 +33,10 @@ export const EditorSurface = ({
   error = null
 }: EditorSurfaceProps) => {
   const provider = useMemo(() => {
-    // Note: Y.js provider requires documentId, wsUrl, and wsManager
-    // For now, we'll create a basic provider structure
-    // TODO: Integrate with WebSocket manager when collaboration is fully implemented
-    if (!documentId) return null;
-    
-    // This is a simplified version - full implementation would pass wsUrl and wsManager
-    const mockWsManager = {
-      send: () => {},
-      disconnect: () => {},
-      isConnected: () => false
-    } as any;
-    
-    return getYjsProvider(documentId, "", mockWsManager);
+    if (!documentId) {
+      return null;
+    }
+    return getYjsProvider(documentId);
   }, [documentId]);
   
   const syncManager = useMemo(
@@ -63,13 +54,17 @@ export const EditorSurface = ({
   }, [onChange]);
 
   const editor = useEditor({
-    extensions: createEditorExtensions({
-      collaboration: {
-        doc: provider.doc,
-        awareness: provider.awareness,
-        user: DEFAULT_USER
-      }
-    }),
+    extensions: createEditorExtensions(
+      provider
+        ? {
+            collaboration: {
+              doc: provider.doc,
+              awareness: provider.awareness,
+              user: DEFAULT_USER
+            }
+          }
+        : undefined
+    ),
     content: EMPTY_TIPTAP_DOC,
     editable,
     onUpdate: ({ editor: editorInstance }) => {
@@ -101,6 +96,9 @@ export const EditorSurface = ({
   }, [editor, editable]);
 
   useEffect(() => {
+    if (!syncManager) {
+      return;
+    }
     syncManager.start();
     return () => {
       syncManager.stop();
@@ -143,4 +141,3 @@ export const EditorSurface = ({
     </>
   );
 };
-
