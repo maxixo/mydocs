@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { JSONContent } from "@tiptap/core";
 import { EditorSurface } from "../editor/Editor";
 import { useDocument } from "../hooks/useDocument";
 import { createDocument } from "../services/document.service";
+import { searchDocumentsWithFallback } from "../services/search.service";
+import { indexDocument, type SearchResult } from "../offline/searchIndex";
+import { debounce } from "../utils/debounce";
 import { EMPTY_TIPTAP_DOC } from "../utils/tiptapContent";
 import { connectWebSocket, type WebSocketManager } from "../websocket/socket.js";
 import { ClientEvent } from "@shared/events";
@@ -22,6 +25,9 @@ export const Editor = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editorStats, setEditorStats] = useState({ wordCount: 0, charCount: 0 });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchStatus, setSearchStatus] = useState<"idle" | "loading" | "local" | "remote">("idle");
   const fallbackTitle = id ? id.replace(/-/g, " ") : "Untitled document";
   const docTitle = document?.title ?? fallbackTitle;
   const displayTitle = docTitle.trim().length > 0 ? docTitle : "Untitled document";
@@ -38,6 +44,17 @@ export const Editor = () => {
     updateDocumentRef.current = updateDocument;
   }, [updateDocument]);
 
+  const debouncedYjsIndexUpdate = useMemo(
+    () =>
+      debounce((payload: { id: string; title: string; workspaceId: string; content: JSONContent }) => {
+        void indexDocument({
+          ...payload,
+          updatedAt: new Date().toISOString()
+        });
+      }, 500),
+    [indexDocument]
+  );
+
   const handleContentChange = useCallback((nextContent: JSONContent) => {
     const currentDocument = documentRef.current;
     if (!currentDocument) {
@@ -53,6 +70,28 @@ export const Editor = () => {
     documentRef.current = nextDocument;
     updateDocumentRef.current(nextDocument);
   }, []);
+
+  const handleYjsUpdate = useCallback(
+    (nextContent: JSONContent) => {
+      const currentDocument = documentRef.current;
+      if (!currentDocument) {
+        return;
+      }
+
+      const documentId = currentDocument.id ?? id;
+      if (!documentId) {
+        return;
+      }
+
+      debouncedYjsIndexUpdate({
+        id: documentId,
+        title: currentDocument.title ?? "",
+        workspaceId: currentDocument.workspaceId ?? workspaceId,
+        content: nextContent
+      });
+    },
+    [debouncedYjsIndexUpdate, id, workspaceId]
+  );
 
   const handleTitleChange = useCallback((nextTitle: string) => {
     const currentDocument = documentRef.current;
@@ -98,6 +137,7 @@ export const Editor = () => {
   const documentId = document?.id ?? id ?? null;
   const editorContent = (document?.content as JSONContent) ?? emptyContent;
   const isEditable = Boolean(document) && !loading && !error;
+  const searchActive = searchQuery.trim().length > 0;
 
   // WebSocket and collaboration state
   const wsManagerRef = useRef<WebSocketManager | null>(null);
@@ -143,6 +183,31 @@ export const Editor = () => {
     };
   }, [documentId, workspaceId]);
 
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed || !workspaceId) {
+      setSearchResults([]);
+      setSearchStatus("idle");
+      return;
+    }
+
+    let isActive = true;
+    const timeoutId = window.setTimeout(async () => {
+      setSearchStatus("loading");
+      const { results, source } = await searchDocumentsWithFallback(workspaceId, trimmed);
+      if (!isActive) {
+        return;
+      }
+      setSearchResults(results);
+      setSearchStatus(source);
+    }, 200);
+
+    return () => {
+      isActive = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [searchQuery, workspaceId]);
+
   // Cleanup WebSocket on unmount
   useEffect(() => {
     return () => {
@@ -180,6 +245,8 @@ export const Editor = () => {
                   className="w-full bg-transparent text-sm placeholder:text-[#4c4d9a] focus:border-none focus:ring-0"
                   placeholder="Search docs..."
                   type="text"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
                 />
                 <span className="rounded border border-[#4c4d9a]/30 px-1 text-[10px] font-bold text-[#4c4d9a]">K</span>
               </label>
@@ -216,29 +283,51 @@ export const Editor = () => {
                 <span className="text-sm font-medium">Collections</span>
               </a>
               <p className="mb-2 mt-6 px-3 text-[11px] font-bold uppercase tracking-wider text-[#4c4d9a]">
-                Recent Docs
+                {searchActive ? "Search Results" : "Recent Docs"}
               </p>
-              <div className="flex flex-col gap-1">
-                <a
-                  className="truncate px-3 py-1.5 text-sm text-[#4c4d9a] hover:text-primary dark:text-[#8a8bbd]"
-                  href="#"
-                >
-                  Q4 Roadmap 2023
-                </a>
-                <a
-                  className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-1.5 text-sm font-medium text-[#0d0e1b] dark:text-white"
-                  href="#"
-                >
-                  <span className="truncate">Product Strategy 2024</span>
-                  <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
-                </a>
-                <a
-                  className="truncate px-3 py-1.5 text-sm text-[#4c4d9a] hover:text-primary dark:text-[#8a8bbd]"
-                  href="#"
-                >
-                  Meeting Notes: Kickoff
-                </a>
-              </div>
+              {searchActive ? (
+                <div className="flex flex-col gap-1">
+                  {searchStatus === "loading" ? (
+                    <p className="px-3 py-1.5 text-xs text-[#4c4d9a] dark:text-[#8a8bbd]">Searching...</p>
+                  ) : searchResults.length > 0 ? (
+                    searchResults.map((result) => (
+                      <Link
+                        key={result.id}
+                        className="truncate px-3 py-1.5 text-sm text-[#4c4d9a] hover:text-primary dark:text-[#8a8bbd]"
+                        to={`/editor/${encodeURIComponent(result.id)}?workspaceId=${encodeURIComponent(
+                          result.workspaceId || workspaceId
+                        )}`}
+                      >
+                        {result.title || "Untitled document"}
+                      </Link>
+                    ))
+                  ) : (
+                    <p className="px-3 py-1.5 text-xs text-[#4c4d9a] dark:text-[#8a8bbd]">No matches found</p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <a
+                    className="truncate px-3 py-1.5 text-sm text-[#4c4d9a] hover:text-primary dark:text-[#8a8bbd]"
+                    href="#"
+                  >
+                    Q4 Roadmap 2023
+                  </a>
+                  <a
+                    className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-1.5 text-sm font-medium text-[#0d0e1b] dark:text-white"
+                    href="#"
+                  >
+                    <span className="truncate">Product Strategy 2024</span>
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
+                  </a>
+                  <a
+                    className="truncate px-3 py-1.5 text-sm text-[#4c4d9a] hover:text-primary dark:text-[#8a8bbd]"
+                    href="#"
+                  >
+                    Meeting Notes: Kickoff
+                  </a>
+                </div>
+              )}
             </nav>
 
             <div className="flex items-center gap-3 border-t border-[#e7e7f3] pt-4 dark:border-[#2d2e4a]">
@@ -339,6 +428,7 @@ export const Editor = () => {
               onChange={handleContentChange}
               onTitleChange={handleTitleChange}
               onStatsChange={setEditorStats}
+              onYjsUpdate={handleYjsUpdate}
               autoFocusTitle={shouldFocusTitle}
               docTitle={docTitle}
               loading={loading}

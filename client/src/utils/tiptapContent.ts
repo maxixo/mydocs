@@ -52,3 +52,39 @@ export const sanitizeTipTapContent = (content: unknown): JSONContent => {
 
   return sanitized;
 };
+
+const BLOCK_NODES = new Set(["paragraph", "heading", "listItem", "blockquote", "codeBlock"]);
+
+const collectText = (node: JSONContent | null | undefined, parts: string[]) => {
+  if (!node || typeof node !== "object") {
+    return;
+  }
+
+  if (node.type === "text") {
+    const text = typeof node.text === "string" ? node.text : "";
+    if (text) {
+      parts.push(text);
+    }
+    return;
+  }
+
+  if (node.type === "hardBreak") {
+    parts.push(" ");
+    return;
+  }
+
+  if (Array.isArray(node.content)) {
+    node.content.forEach((child) => collectText(child, parts));
+  }
+
+  if (node.type && BLOCK_NODES.has(node.type)) {
+    parts.push(" ");
+  }
+};
+
+export const getTipTapText = (content: unknown): string => {
+  const sanitized = sanitizeTipTapContent(content);
+  const parts: string[] = [];
+  collectText(sanitized, parts);
+  return parts.join("").replace(/\s+/g, " ").trim();
+};

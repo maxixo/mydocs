@@ -37,6 +37,7 @@ type EditorSurfaceProps = {
   docTitle: string;
   onTitleChange: (title: string) => void;
   onStatsChange?: (stats: EditorStats) => void;
+  onYjsUpdate?: (content: JSONContent) => void;
   autoFocusTitle?: boolean;
   loading?: boolean;
   error?: string | null;
@@ -49,6 +50,7 @@ export const EditorSurface = ({
   onChange,
   onTitleChange,
   onStatsChange,
+  onYjsUpdate,
   autoFocusTitle = false,
   docTitle,
   loading = false,
@@ -56,6 +58,7 @@ export const EditorSurface = ({
 }: EditorSurfaceProps) => {
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const onStatsChangeRef = useRef(onStatsChange);
+  const onYjsUpdateRef = useRef(onYjsUpdate);
   const [isEmpty, setIsEmpty] = useState(true);
   const didAutoFocusRef = useRef(false);
   const provider = useMemo(() => {
@@ -82,6 +85,10 @@ export const EditorSurface = ({
   useEffect(() => {
     onStatsChangeRef.current = onStatsChange;
   }, [onStatsChange]);
+
+  useEffect(() => {
+    onYjsUpdateRef.current = onYjsUpdate;
+  }, [onYjsUpdate]);
 
   useEffect(() => {
     didAutoFocusRef.current = false;
@@ -157,6 +164,24 @@ export const EditorSurface = ({
       syncManager.stop();
     };
   }, [syncManager]);
+
+  useEffect(() => {
+    if (!provider || !editor) {
+      return;
+    }
+
+    const handleYjsUpdate = () => {
+      if (!onYjsUpdateRef.current) {
+        return;
+      }
+      onYjsUpdateRef.current(editor.getJSON() as JSONContent);
+    };
+
+    provider.doc.on("update", handleYjsUpdate);
+    return () => {
+      provider.doc.off("update", handleYjsUpdate);
+    };
+  }, [editor, provider]);
 
   useEffect(() => {
     if (!autoFocusTitle || !editable || !titleInputRef.current || didAutoFocusRef.current) {

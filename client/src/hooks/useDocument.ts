@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DocumentState } from "../types";
 import { createDocument, fetchDocumentById, updateDocument } from "../services/document.service";
 import { saveDocument as cacheDocument } from "../offline/indexedDb";
+import { indexDocument } from "../offline/searchIndex";
 import { debounce } from "../utils/debounce";
 import { EMPTY_TIPTAP_DOC, sanitizeTipTapContent } from "../utils/tiptapContent";
 
@@ -55,6 +56,7 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
           };
           setDocument(nextDocument);
           void cacheDocument(nextDocument).catch(() => undefined);
+          void indexDocument(nextDocument);
           return;
         }
 
@@ -64,6 +66,7 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
         };
         setDocument(nextDocument);
         void cacheDocument(nextDocument).catch(() => undefined);
+        void indexDocument(nextDocument);
       } catch (err) {
         if (isMounted) {
           setError(err instanceof Error ? err.message : "Failed to load document");
@@ -115,6 +118,12 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
     }, DEFAULT_AUTOSAVE_MS);
   }, [persistDocument]);
 
+  const debouncedIndexUpdate = useMemo(() => {
+    return debounce((next: DocumentState) => {
+      void indexDocument(next);
+    }, DEFAULT_AUTOSAVE_MS);
+  }, [indexDocument]);
+
   const updateDocumentState = useCallback(
     (next: DocumentState) => {
       setDocument(next);
@@ -124,8 +133,9 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
       pendingSaveRef.current = saveId;
       setSaveStatus("saving");
       debouncedPersist(next, saveId);
+      debouncedIndexUpdate(next);
     },
-    [debouncedPersist]
+    [debouncedIndexUpdate, debouncedPersist]
   );
 
   return {
