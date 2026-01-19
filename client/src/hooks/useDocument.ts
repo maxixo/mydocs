@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DocumentState } from "../types";
 import { createDocument, fetchDocumentById, updateDocument } from "../services/document.service";
+import { saveDocument as cacheDocument } from "../offline/indexedDb";
 import { debounce } from "../utils/debounce";
 import { EMPTY_TIPTAP_DOC, sanitizeTipTapContent } from "../utils/tiptapContent";
 
@@ -48,17 +49,21 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
           if (!isMounted) {
             return;
           }
-          setDocument({
+          const nextDocument = {
             ...created,
             content: sanitizeTipTapContent(created.content) as DocumentState["content"]
-          });
+          };
+          setDocument(nextDocument);
+          void cacheDocument(nextDocument).catch(() => undefined);
           return;
         }
 
-        setDocument({
+        const nextDocument = {
           ...result,
           content: sanitizeTipTapContent(result.content) as DocumentState["content"]
-        });
+        };
+        setDocument(nextDocument);
+        void cacheDocument(nextDocument).catch(() => undefined);
       } catch (err) {
         if (isMounted) {
           setError(err instanceof Error ? err.message : "Failed to load document");
@@ -113,6 +118,7 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
   const updateDocumentState = useCallback(
     (next: DocumentState) => {
       setDocument(next);
+      void cacheDocument(next).catch(() => undefined);
       saveCounterRef.current += 1;
       const saveId = saveCounterRef.current;
       pendingSaveRef.current = saveId;

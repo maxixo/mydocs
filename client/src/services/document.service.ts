@@ -1,3 +1,10 @@
+import {
+  getDocument as getCachedDocument,
+  listDocumentsByWorkspace,
+  saveDocument,
+  saveDocuments
+} from "../offline/indexedDb";
+
 export type TipTapContent = Record<string, unknown>;
 
 export interface DocumentSummary {
@@ -24,32 +31,59 @@ const parseJson = async <T>(response: Response): Promise<T> => {
   return data;
 };
 
+const safeStore = async (task: () => Promise<void>) => {
+  try {
+    await task();
+  } catch {
+    // Ignore IndexedDB failures to avoid blocking network responses.
+  }
+};
+
 export const fetchDocuments = async (workspaceId: string): Promise<DocumentSummary[]> => {
-  const response = await fetch(
-    `${API_BASE_URL}/api/documents?workspaceId=${encodeURIComponent(workspaceId)}`,
-    { credentials: "include" }
-  );
-  const data = await parseJson<{ documents: DocumentSummary[] }>(response);
-  return data.documents ?? [];
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/documents?workspaceId=${encodeURIComponent(workspaceId)}`,
+      { credentials: "include" }
+    );
+    const data = await parseJson<{ documents: DocumentSummary[] }>(response);
+    const documents = data.documents ?? [];
+    await safeStore(() => saveDocuments(documents));
+    return documents;
+  } catch (error) {
+    if (!navigator.onLine) {
+      return listDocumentsByWorkspace(workspaceId);
+    }
+    throw error;
+  }
 };
 
 export const fetchDocumentById = async (
   id: string,
   workspaceId: string
 ): Promise<DocumentDetail | null> => {
-  const response = await fetch(
-    `${API_BASE_URL}/api/documents/${encodeURIComponent(id)}?workspaceId=${encodeURIComponent(
-      workspaceId
-    )}`,
-    { credentials: "include" }
-  );
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/documents/${encodeURIComponent(id)}?workspaceId=${encodeURIComponent(
+        workspaceId
+      )}`,
+      { credentials: "include" }
+    );
 
-  if (response.status === 404) {
-    return null;
+    if (response.status === 404) {
+      return null;
+    }
+
+    const data = await parseJson<{ document: DocumentDetail }>(response);
+    if (data.document) {
+      await safeStore(() => saveDocument(data.document));
+    }
+    return data.document ?? null;
+  } catch (error) {
+    if (!navigator.onLine) {
+      return getCachedDocument(id);
+    }
+    throw error;
   }
-
-  const data = await parseJson<{ document: DocumentDetail }>(response);
-  return data.document ?? null;
 };
 
 export const createDocument = async (payload: {
@@ -66,6 +100,9 @@ export const createDocument = async (payload: {
   });
 
   const data = await parseJson<{ document: DocumentDetail }>(response);
+  if (data.document) {
+    await safeStore(() => saveDocument(data.document));
+  }
   return data.document;
 };
 
@@ -91,5 +128,8 @@ export const updateDocument = async (payload: {
   );
 
   const data = await parseJson<{ document: DocumentDetail }>(response);
+  if (data.document) {
+    await safeStore(() => saveDocument(data.document));
+  }
   return data.document;
 };
