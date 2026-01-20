@@ -9,7 +9,7 @@ import { EMPTY_TIPTAP_DOC, sanitizeTipTapContent } from "../utils/tiptapContent"
 const DEFAULT_AUTOSAVE_MS = 1200;
 const EMPTY_CONTENT = EMPTY_TIPTAP_DOC;
 
-export type SaveStatus = "idle" | "saving" | "saved" | "error";
+export type SaveStatus = "idle" | "saving" | "saved" | "error" | "conflict";
 
 export const useDocument = (documentId?: string, workspaceId?: string) => {
   const [document, setDocument] = useState<DocumentState | null>(null);

@@ -19,7 +19,7 @@ type MetaRecord = {
 };
 
 const DB_NAME = "collab-editor";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const DOCUMENT_STORE = "documents";
 const OPERATIONS_STORE = "operations";
 const META_STORE = "meta";

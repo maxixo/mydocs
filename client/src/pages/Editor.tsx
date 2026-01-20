@@ -3,7 +3,10 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from "reac
 import type { JSONContent } from "@tiptap/core";
 import { EditorSurface } from "../editor/Editor";
 import { useDocument } from "../hooks/useDocument";
-import { createDocument } from "../services/document.service";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import { usePresence } from "../hooks/usePresence";
+import { useAppStore, actions, type Collaborator } from "../app/store";
+import { createDocument, fetchDocuments } from "../services/document.service";
 import { searchDocumentsWithFallback } from "../services/search.service";
 import { indexDocument, type SearchResult } from "../offline/searchIndex";
 import { debounce } from "../utils/debounce";
@@ -11,6 +14,7 @@ import { EMPTY_TIPTAP_DOC } from "../utils/tiptapContent";
 import { connectWebSocket, type WebSocketManager } from "../websocket/socket.js";
 import { ClientEvent } from "@shared/events";
 import type { ServerSyncResponsePayload, ServerPresenceBroadcastPayload } from "@shared/types";
+import { ConflictModal } from "../components/ConflictModal";
 
 export const Editor = () => {
   const emptyContent: JSONContent = EMPTY_TIPTAP_DOC;
@@ -19,22 +23,81 @@ export const Editor = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const workspaceId = searchParams.get("workspaceId") ?? "default";
+  
+  // Store hooks
+  const { recentDocuments, connectionStatus, saveStatus: globalSaveStatus, dispatch } = useAppStore();
+  const isOnline = useOnlineStatus();
+  const { onlineCount, collaborators } = usePresence(id);
+  
+  // Document hooks
   const { document, updateDocument, loading, error, saveStatus } = useDocument(id, workspaceId);
   const documentRef = useRef(document);
   const updateDocumentRef = useRef(updateDocument);
+  
+  // UI State
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editorStats, setEditorStats] = useState({ wordCount: 0, charCount: 0 });
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchStatus, setSearchStatus] = useState<"idle" | "loading" | "local" | "remote">("idle");
+  
+  // Conflict Modal State
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [localVersion, setLocalVersion] = useState<JSONContent>(EMPTY_TIPTAP_DOC);
+  const [serverVersion, setServerVersion] = useState<JSONContent>(EMPTY_TIPTAP_DOC);
+  
+  // Display helpers
   const fallbackTitle = id ? id.replace(/-/g, " ") : "Untitled document";
   const docTitle = document?.title ?? fallbackTitle;
   const displayTitle = docTitle.trim().length > 0 ? docTitle : "Untitled document";
   const shouldFocusTitle = Boolean((location.state as { focusTitle?: boolean } | null)?.focusTitle);
-  const saveLabel = saveStatus === "saving" ? "Saving..." : saveStatus === "error" ? "Error" : "Saved";
-  const saveIcon = saveStatus === "saving" ? "cloud_upload" : saveStatus === "error" ? "error" : "cloud_done";
-  const saveClass = saveStatus === "error" ? "text-red-500" : "text-[#4c4d9a]";
+  
+  // Sync connection status with online status
+  useEffect(() => {
+    const status: "online" | "offline" | "reconnecting" = isOnline ? "online" : "offline";
+    dispatch(actions.setConnectionStatus(status));
+  }, [isOnline, dispatch]);
+  
+  // Sync save status with global store
+  useEffect(() => {
+    if (saveStatus === "conflict") {
+      dispatch(actions.setSaveStatus("conflict"));
+      setShowConflictModal(true);
+      setLocalVersion(documentRef.current?.content as JSONContent ?? EMPTY_TIPTAP_DOC);
+    } else if (saveStatus === "saving") {
+      dispatch(actions.setSaveStatus("saving"));
+    } else if (saveStatus === "error") {
+      dispatch(actions.setSaveStatus("error"));
+    } else if (saveStatus === "saved") {
+      dispatch(actions.setSaveStatus("saved"));
+    }
+    // Don't sync "idle" state to store - keep previous state
+  }, [saveStatus, dispatch]);
+  
+  // Set active document
+  useEffect(() => {
+    dispatch(actions.setActiveDocument(id || null));
+  }, [id, dispatch]);
+  
+  // Fetch recent documents
+  useEffect(() => {
+    const loadRecentDocuments = async () => {
+      try {
+        const docs = await fetchDocuments(workspaceId);
+        dispatch(actions.setRecentDocuments(docs));
+      } catch (err) {
+        console.error("Failed to fetch recent documents:", err);
+      }
+    };
+    
+    loadRecentDocuments();
+  }, [workspaceId, dispatch]);
+  
+  const displaySaveStatus = saveStatus === "idle" ? globalSaveStatus : saveStatus;
+  const saveLabel = displaySaveStatus === "saving" ? "Saving..." : displaySaveStatus === "error" ? "Error" : displaySaveStatus === "conflict" ? "Conflict" : "Saved";
+  const saveIcon = displaySaveStatus === "saving" ? "cloud_upload" : displaySaveStatus === "error" ? "error" : displaySaveStatus === "conflict" ? "warning" : "cloud_done";
+  const saveClass = displaySaveStatus === "error" || displaySaveStatus === "conflict" ? "text-red-500" : "text-[#4c4d9a]";
 
   useEffect(() => {
     documentRef.current = document;
@@ -107,7 +170,18 @@ export const Editor = () => {
 
     documentRef.current = nextDocument;
     updateDocumentRef.current(nextDocument);
-  }, []);
+    
+    // Update in recent documents list
+    if (currentDocument.id) {
+      dispatch(actions.updateRecentDocument({
+        id: currentDocument.id,
+        title: nextTitle,
+        updatedAt: new Date().toISOString(),
+        ownerId: currentDocument.ownerId,
+        workspaceId: currentDocument.workspaceId || workspaceId
+      }));
+    }
+  }, [workspaceId, dispatch]);
 
   const handleCreateDocument = useCallback(async () => {
     if (isCreating) {
@@ -134,6 +208,32 @@ export const Editor = () => {
     }
   }, [emptyContent, isCreating, navigate, workspaceId]);
 
+  // Conflict resolution handlers
+  const handleKeepLocal = useCallback(() => {
+    // Force save local version to server
+    const currentDocument = documentRef.current;
+    if (currentDocument) {
+      updateDocumentRef.current(currentDocument);
+    }
+    setShowConflictModal(false);
+  }, []);
+
+  const handleUseServer = useCallback(() => {
+    // Reload server version
+    setShowConflictModal(false);
+    window.location.reload();
+  }, []);
+
+  const handleMergeManual = useCallback(() => {
+    // Open manual merge interface (for now, close modal)
+    setShowConflictModal(false);
+    alert("Manual merge feature coming soon!");
+  }, []);
+
+  const handleConflictClose = useCallback(() => {
+    setShowConflictModal(false);
+  }, []);
+
   const documentId = document?.id ?? id ?? null;
   const editorContent = (document?.content as JSONContent) ?? emptyContent;
   const isEditable = Boolean(document) && !loading && !error;
@@ -156,6 +256,7 @@ export const Editor = () => {
       },
       onSyncResponse: (payload: ServerSyncResponsePayload) => {
         console.log("Document synced:", payload.document);
+        setServerVersion(payload.document.content as JSONContent);
       },
       onPresenceBroadcast: (payload: ServerPresenceBroadcastPayload) => {
         console.log("Presence update:", payload.presence);
@@ -307,25 +408,24 @@ export const Editor = () => {
                 </div>
               ) : (
                 <div className="flex flex-col gap-1">
-                  <a
-                    className="truncate px-3 py-1.5 text-sm text-[#4c4d9a] hover:text-primary dark:text-[#8a8bbd]"
-                    href="#"
-                  >
-                    Q4 Roadmap 2023
-                  </a>
-                  <a
-                    className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-1.5 text-sm font-medium text-[#0d0e1b] dark:text-white"
-                    href="#"
-                  >
-                    <span className="truncate">Product Strategy 2024</span>
-                    <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
-                  </a>
-                  <a
-                    className="truncate px-3 py-1.5 text-sm text-[#4c4d9a] hover:text-primary dark:text-[#8a8bbd]"
-                    href="#"
-                  >
-                    Meeting Notes: Kickoff
-                  </a>
+                  {recentDocuments.length > 0 ? (
+                    recentDocuments.slice(0, 5).map((doc) => (
+                      <Link
+                        key={doc.id}
+                        className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                          doc.id === documentId
+                            ? "bg-primary/10 font-medium text-[#0d0e1b] dark:text-white"
+                            : "text-[#4c4d9a] hover:text-primary hover:bg-[#e7e7f3]/50 dark:text-[#8a8bbd] dark:hover:bg-[#1c1d3a]/50"
+                        }`}
+                        to={`/editor/${encodeURIComponent(doc.id)}?workspaceId=${encodeURIComponent(doc.workspaceId || workspaceId)}`}
+                      >
+                        <span className="truncate">{doc.title || "Untitled document"}</span>
+                        {doc.id === documentId && <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>}
+                      </Link>
+                    ))
+                  ) : (
+                    <p className="px-3 py-1.5 text-xs text-[#4c4d9a] dark:text-[#8a8bbd]">No recent documents</p>
+                  )}
                 </div>
               )}
             </nav>
@@ -364,36 +464,38 @@ export const Editor = () => {
             </div>
 
             <div className="flex items-center gap-6">
+              {/* Presence/Collaborators */}
               <div className="flex items-center">
                 <div className="flex -space-x-3 overflow-hidden">
-                  <div
-                    className="inline-block h-8 w-8 rounded-full bg-cover ring-2 ring-white dark:ring-background-dark"
-                    data-alt="Collaborator avatar Sarah"
-                    style={{
-                      backgroundImage:
-                        "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDAL21GUfQ231Ru5rk8S_mo-xrbrpl-ZLv5Aw6psKZrblirort14zYKzFCwyrNmnjlfcrmnXu_p8SgC7Gzf4VpGMb7xBS7taASasSiro8UkEMI1WfD2sFeXp86_Dil-WzvQYwSFtYSXxbRWUUSpaz42aaLo5fsWwH7c74_Dj2N0cbx5YeAr_DJgrKO29xSwmkHscYC2F-WBNP3ANNFKuu_1Q_U-NkHq1qk0mknd1ID-iNXJBY2yzE6k63qKvA0yZm6SemNAww0M_Q')"
-                    }}
-                  ></div>
-                  <div
-                    className="inline-block h-8 w-8 rounded-full bg-cover ring-2 ring-white dark:ring-background-dark"
-                    data-alt="Collaborator avatar James"
-                    style={{
-                      backgroundImage:
-                        "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBFeBpDNUHf1uevsEgvpGGdyVmRvDXsQR676z17h_xsmth0aqVpvTZJcrDz7Bj7LpDEFwOY34HkFrAZpHAPU7BDATOwHzGnx4TWkUnKhUFqYuzzP8_HVawmqsRmFdnL4yJbZi3uP1q-jLTHfmePEEyAS-uVGo9kZqCtzUMuvemmmgXoEjDg7VAElc-Q0QlWwSS4WQaT5Ayxa6UXbdkKEaRtHwCAfov5FzVgViNRgbthRonsdcW_8AZnPfRYgZmUT56yPBonUZ9jsw')"
-                    }}
-                  ></div>
-                  <div
-                    className="inline-block h-8 w-8 rounded-full bg-cover ring-2 ring-white dark:ring-background-dark"
-                    data-alt="Collaborator avatar Maria"
-                    style={{
-                      backgroundImage:
-                        "url('https://lh3.googleusercontent.com/aida-public/AB6AXuC4s-GGjXk6BbIxNjarp3fAtcQxTDn2H1R-Dl-nRDqNoN8FFHWkiDGydIcvesiCRkb3ND33lewAAzqTY97OT-Un46I1H2mOjeIsyojoszgg-Ef5FFbQndGN18z7TntUpu0AOLmeBaIKUvVpyQrKFhc_tvu4AktGZR5jJA45bdQsImtIYsArg6LBESCqvFBJ8dIbzd-bJvUnvE0l_fqXmDkst7ijTHtRprL1CmLQnp8cxYR6OEU1fy5dKd17NwARiL0b801pxCyvOg')"
-                    }}
-                  ></div>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e7e7f3] text-[10px] font-bold text-[#4c4d9a] ring-2 ring-white dark:bg-[#1c1d3a] dark:ring-background-dark">
-                    +2
-                  </div>
+                  {collaborators.slice(0, 5).map((collaborator: Collaborator) => (
+                    <div
+                      key={collaborator.id}
+                      className="inline-block h-8 w-8 rounded-full bg-cover ring-2 ring-white dark:ring-background-dark"
+                      data-alt={`Collaborator avatar ${collaborator.name}`}
+                      style={{
+                        backgroundImage: collaborator.avatar || `linear-gradient(135deg, ${collaborator.color}, ${collaborator.color}dd)`,
+                        backgroundColor: !collaborator.avatar ? collaborator.color : undefined
+                      }}
+                      title={collaborator.name}
+                    >
+                      {!collaborator.avatar && (
+                        <span className="flex h-full w-full items-center justify-center text-xs font-bold text-white">
+                          {collaborator.name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                  {collaborators.length > 5 && (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e7e7f3] text-[10px] font-bold text-[#4c4d9a] ring-2 ring-white dark:bg-[#1c1d3a] dark:ring-background-dark">
+                      +{collaborators.length - 5}
+                    </div>
+                  )}
                 </div>
+                {onlineCount > 0 && (
+                  <span className="ml-3 text-xs text-[#4c4d9a]">
+                    {onlineCount} {onlineCount === 1 ? 'collaborator' : 'collaborators'} online
+                  </span>
+                )}
               </div>
               <div className="h-6 w-px bg-[#e7e7f3] dark:bg-[#2d2e4a]"></div>
               <div className="flex items-center gap-2">
@@ -442,18 +544,34 @@ export const Editor = () => {
               <span>Words: {editorStats.wordCount.toLocaleString()}</span>
             </div>
             <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                Online
+              <span className={`flex items-center gap-1 ${isOnline ? "text-green-500" : "text-gray-500"}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-green-500" : "bg-gray-500"}`}></span>
+                {isOnline ? "Online" : "Offline"}
               </span>
-              <span className={`flex items-center gap-1 ${saveClass}`} aria-live="polite">
-                <span className="material-symbols-outlined !text-xs">{saveIcon}</span>
+              <button
+                className={`flex items-center gap-1 transition-colors hover:opacity-80 ${displaySaveStatus === "conflict" ? "cursor-pointer hover:underline" : ""}`}
+                onClick={displaySaveStatus === "conflict" ? () => setShowConflictModal(true) : undefined}
+                type={displaySaveStatus === "conflict" ? "button" : undefined}
+              >
+                <span className={`material-symbols-outlined !text-xs ${saveClass}`}>{saveIcon}</span>
                 {saveLabel}
-              </span>
+              </button>
             </div>
           </footer>
         </main>
       </div>
+      
+      {/* Conflict Modal */}
+      <ConflictModal
+        isOpen={showConflictModal}
+        localVersion={localVersion}
+        serverVersion={serverVersion}
+        documentTitle={displayTitle}
+        onKeepLocal={handleKeepLocal}
+        onUseServer={handleUseServer}
+        onMergeManual={handleMergeManual}
+        onClose={handleConflictClose}
+      />
     </div>
   );
 };

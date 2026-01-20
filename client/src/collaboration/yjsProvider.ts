@@ -47,6 +47,7 @@ class LocalYjsProvider implements YjsProvider {
 const providers = new Map<string, LocalYjsProvider>();
 
 export const getYjsProvider = (documentId: string): YjsProvider => {
+  // Create a new provider for this document
   if (!providers.has(documentId)) {
     providers.set(documentId, new LocalYjsProvider());
   }
@@ -60,4 +61,10 @@ export const destroyYjsProvider = (documentId: string): void => {
   }
   provider.destroy();
   providers.delete(documentId);
+};
+
+// Destroy all providers - useful for cleanup during tests or app shutdown
+export const destroyAllYjsProviders = (): void => {
+  providers.forEach((provider) => provider.destroy());
+  providers.clear();
 };

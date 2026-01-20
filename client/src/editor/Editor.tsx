@@ -3,7 +3,7 @@ import { BubbleMenu, EditorContent, useEditor } from "@tiptap/react";
 import type { Editor as TipTapEditor, JSONContent } from "@tiptap/core";
 import { createEditorExtensions } from "./editorConfig";
 import { Toolbar } from "./Toolbar";
-import { getYjsProvider } from "../collaboration/yjsProvider";
+import { getYjsProvider, destroyYjsProvider } from "../collaboration/yjsProvider";
 import { createSyncManager } from "../collaboration/syncManager";
 import { EMPTY_TIPTAP_DOC, sanitizeTipTapContent } from "../utils/tiptapContent";
 
@@ -67,6 +67,7 @@ export const EditorSurface = ({
     }
     return getYjsProvider(documentId);
   }, [documentId]);
+  const prevDocumentIdRef = useRef<string | null>(null);
   
   const syncManager = useMemo(
     () =>
@@ -164,6 +165,7 @@ export const EditorSurface = ({
       syncManager.stop();
     };
   }, [syncManager]);
+
 
   useEffect(() => {
     if (!provider || !editor) {

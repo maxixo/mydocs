@@ -1,6 +1,6 @@
 import MiniSearch from "minisearch";
 import type { DocumentState } from "../types";
-import { getMeta, setMeta } from "./indexedDb";
+import { getMeta, listDocumentsByWorkspace, setMeta } from "./indexedDb";
 import { getTipTapText } from "../utils/tiptapContent";
 import { debounce } from "../utils/debounce";
 
@@ -52,6 +52,7 @@ const createIndex = () =>
 const indexCache = new Map<string, MiniSearch<IndexedDocument>>();
 const lastIndexedContent = new Map<string, string>();
 const persistQueue = new Map<string, ReturnType<typeof debounce>>();
+const hydratedFromCache = new Set<string>();
 
 const getIndexKey = (workspaceId: string) => `${INDEX_META_PREFIX}${workspaceId}`;
 
@@ -60,7 +61,13 @@ const getIndex = async (workspaceId: string): Promise<MiniSearch<IndexedDocument
     return indexCache.get(workspaceId)!;
   }
 
-  const stored = await getMeta<StoredIndexSnapshot>(getIndexKey(workspaceId));
+  let stored: StoredIndexSnapshot | null = null;
+  try {
+    stored = await getMeta<StoredIndexSnapshot>(getIndexKey(workspaceId));
+  } catch {
+    stored = null;
+  }
+
   if (stored?.index && stored.version === INDEX_VERSION) {
     try {
       const restored = MiniSearch.loadJSON(stored.index, {
@@ -149,12 +156,50 @@ export const indexDocument = async (document: IndexableDocument): Promise<void> 
   schedulePersist(entry.workspaceId, index);
 };
 
+const hydrateIndexFromCache = async (workspaceId: string): Promise<void> => {
+  if (hydratedFromCache.has(workspaceId)) {
+    return;
+  }
+
+  let documents: Awaited<ReturnType<typeof listDocumentsByWorkspace>> = [];
+  try {
+    documents = await listDocumentsByWorkspace(workspaceId);
+  } catch {
+    return;
+  }
+
+  hydratedFromCache.add(workspaceId);
+
+  if (documents.length === 0) {
+    return;
+  }
+
+  const index = await getIndex(workspaceId);
+  const missingDocuments = documents.filter((doc) => !index.has(doc.id));
+  if (missingDocuments.length === 0) {
+    return;
+  }
+
+  await Promise.all(
+    missingDocuments.map((doc) =>
+      indexDocument({
+        id: doc.id,
+        title: doc.title ?? "",
+        workspaceId: doc.workspaceId ?? workspaceId,
+        updatedAt: doc.updatedAt,
+        content: doc.content
+      })
+    )
+  );
+};
+
 export const searchDocumentsLocal = async (workspaceId: string, query: string): Promise<SearchResult[]> => {
   const trimmed = query.trim();
   if (!trimmed) {
     return [];
   }
 
+  await hydrateIndexFromCache(workspaceId);
   const index = await getIndex(workspaceId);
   const results = index.search(trimmed, {
     prefix: true,
