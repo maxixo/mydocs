@@ -107,23 +107,25 @@ const appReducer: Reducer<AppContextValue, AppAction> = (state, action) => {
       };
     
     case "REMOVE_COLLABORATOR":
+      const cursorPositionsAfterRemoval = new Map(state.presence.cursorPositions);
+      cursorPositionsAfterRemoval.delete(action.payload);
       return {
         ...state,
         presence: {
           ...state.presence,
           collaborators: state.presence.collaborators.filter(c => c.id !== action.payload),
-          cursorPositions: new Map([...state.presence.cursorPositions].filter(([id]) => id !== action.payload))
+          cursorPositions: cursorPositionsAfterRemoval
         }
       };
     
     case "UPDATE_CURSOR":
-      const newCursorPositions = new Map(state.presence.cursorPositions);
-      newCursorPositions.set(action.payload.userId, action.payload.position);
+      const cursorPositionsAfterUpdate = new Map(state.presence.cursorPositions);
+      cursorPositionsAfterUpdate.set(action.payload.userId, action.payload.position);
       return {
         ...state,
         presence: {
           ...state.presence,
-          cursorPositions: newCursorPositions
+          cursorPositions: cursorPositionsAfterUpdate
         }
       };
     

@@ -34,7 +34,7 @@ type StoredIndexSnapshot = {
   version: number;
   workspaceId: string;
   updatedAt: number;
-  index: SerializedIndex;
+  index: SerializedIndex | string;
 };
 
 const INDEX_VERSION = 1;
@@ -55,6 +55,8 @@ const persistQueue = new Map<string, ReturnType<typeof debounce>>();
 const hydratedFromCache = new Set<string>();
 
 const getIndexKey = (workspaceId: string) => `${INDEX_META_PREFIX}${workspaceId}`;
+const serializeIndexSnapshot = (index: SerializedIndex | string) =>
+  typeof index === "string" ? index : JSON.stringify(index);
 
 const getIndex = async (workspaceId: string): Promise<MiniSearch<IndexedDocument>> => {
   if (indexCache.has(workspaceId)) {
@@ -63,14 +65,15 @@ const getIndex = async (workspaceId: string): Promise<MiniSearch<IndexedDocument
 
   let stored: StoredIndexSnapshot | null = null;
   try {
-    stored = await getMeta<StoredIndexSnapshot>(getIndexKey(workspaceId));
+    const key = getIndexKey(workspaceId) as string;
+    stored = await getMeta<StoredIndexSnapshot>(key);
   } catch {
     stored = null;
   }
 
   if (stored?.index && stored.version === INDEX_VERSION) {
     try {
-      const restored = MiniSearch.loadJSON(stored.index, {
+      const restored = MiniSearch.loadJSON(serializeIndexSnapshot(stored.index), {
         fields: ["title", "content"],
         storeFields: ["title", "workspaceId", "updatedAt"],
         idField: "id"
@@ -92,10 +95,11 @@ const persistIndex = async (workspaceId: string, index: MiniSearch<IndexedDocume
     version: INDEX_VERSION,
     workspaceId,
     updatedAt: Date.now(),
-    index: index.toJSON()
+    index: JSON.stringify(index.toJSON())
   };
   try {
-    await setMeta(getIndexKey(workspaceId), snapshot);
+    const key = getIndexKey(workspaceId) as string;
+    await setMeta(key, snapshot);
   } catch {
     // Ignore IndexedDB failures to avoid blocking editor updates.
   }
@@ -104,8 +108,8 @@ const persistIndex = async (workspaceId: string, index: MiniSearch<IndexedDocume
 const schedulePersist = (workspaceId: string, index: MiniSearch<IndexedDocument>) => {
   let schedule = persistQueue.get(workspaceId);
   if (!schedule) {
-    schedule = debounce((nextIndex: MiniSearch<IndexedDocument>) => {
-      void persistIndex(workspaceId, nextIndex);
+    schedule = debounce((nextIndex: unknown) => {
+      void persistIndex(workspaceId, nextIndex as MiniSearch<IndexedDocument>);
     }, SAVE_DEBOUNCE_MS);
     persistQueue.set(workspaceId, schedule);
   }
@@ -127,33 +131,50 @@ const buildIndexEntry = (document: IndexableDocument): IndexedDocument => {
 const makeDocumentKey = (workspaceId: string, documentId: string) => `${workspaceId}:${documentId}`;
 
 export const indexDocument = async (document: IndexableDocument): Promise<void> => {
+  // Validate required fields
   if (!document.workspaceId || !document.id) {
+    console.warn("[SearchIndex] Skipping document: missing workspaceId or id", document);
     return;
   }
 
-  const entry = buildIndexEntry(document);
-  const contentKey = `${entry.title}\n${entry.content}`;
-  const cacheKey = makeDocumentKey(entry.workspaceId, entry.id);
-  if (lastIndexedContent.get(cacheKey) === contentKey) {
-    return;
-  }
+  try {
+    const entry = buildIndexEntry(document);
+    const contentKey = `${entry.title}\n${entry.content}`;
+    const cacheKey = makeDocumentKey(entry.workspaceId, entry.id);
+    
+    // Skip if content hasn't changed
+    if (lastIndexedContent.get(cacheKey) === contentKey) {
+      return;
+    }
 
-  const index = await getIndex(entry.workspaceId);
-  const mutableIndex = index as MiniSearch<IndexedDocument> & {
-    remove?: (doc: IndexedDocument | string) => void;
-    removeAll?: (docs: Array<IndexedDocument | string>) => void;
-    discard?: (docId: string) => void;
-  };
-  if (mutableIndex.remove) {
-    mutableIndex.remove(entry.id);
-  } else if (mutableIndex.removeAll) {
-    mutableIndex.removeAll([entry.id]);
-  } else if (mutableIndex.discard) {
-    mutableIndex.discard(entry.id);
+    const index = await getIndex(entry.workspaceId);
+    
+    // Try to remove existing entry, but ignore if it doesn't exist
+    const mutableIndex = index as MiniSearch<IndexedDocument> & {
+      remove?: (doc: IndexedDocument | string) => void;
+      removeAll?: (docs: Array<IndexedDocument | string>) => void;
+      discard?: (docId: string) => void;
+    };
+    
+    try {
+      if (mutableIndex.remove) {
+        mutableIndex.remove(entry.id);
+      } else if (mutableIndex.removeAll) {
+        mutableIndex.removeAll([entry.id]);
+      } else if (mutableIndex.discard) {
+        mutableIndex.discard(entry.id);
+      }
+    } catch (removeError) {
+      // Document might not exist in index yet, that's okay
+    }
+    
+    // Add the new entry
+    index.add(entry);
+    lastIndexedContent.set(cacheKey, contentKey);
+    schedulePersist(entry.workspaceId, index);
+  } catch (error) {
+    console.error("[SearchIndex] Failed to index document", error, document);
   }
-  index.add(entry);
-  lastIndexedContent.set(cacheKey, contentKey);
-  schedulePersist(entry.workspaceId, index);
 };
 
 const hydrateIndexFromCache = async (workspaceId: string): Promise<void> => {

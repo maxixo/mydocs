@@ -29,7 +29,7 @@ export class WebSocketManager {
       this.ws = new WebSocket(this.url);
 
       this.ws.onopen = () => {
-        console.log("WebSocket connected");
+        console.log("[WebSocket] Connected to", this.url);
         this.isConnecting = false;
         this.reconnectAttempts = 0;
         this.reconnectDelay = 1000;
@@ -40,23 +40,26 @@ export class WebSocketManager {
           const message = JSON.parse(event.data);
           this.handleMessage(message);
         } catch (error) {
-          console.error("Error parsing WebSocket message:", error);
+          console.warn("[WebSocket] Failed to parse message:", error);
         }
       };
 
       this.ws.onclose = (event) => {
-        console.log("WebSocket disconnected:", event.code, event.reason);
+        if (event.code !== 1000) {
+          // Only log if it's not an intentional disconnect
+          console.warn("[WebSocket] Disconnected:", event.code, event.reason);
+        }
         this.isConnecting = false;
         this.ws = null;
 
-        // Attempt to reconnect if not intentionally closed
-        if (event.code !== 1000) {
+        // Attempt to reconnect if not intentionally closed and max attempts not reached
+        if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
           this.attemptReconnect();
         }
       };
 
       this.ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
+        // Don't log errors excessively - they're usually just connection failures
         this.isConnecting = false;
       };
 
@@ -130,14 +133,14 @@ export class WebSocketManager {
    */
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("Max reconnection attempts reached");
+      console.warn("[WebSocket] Max reconnection attempts reached. Please refresh the page.");
       return;
     }
 
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
 
-    console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+    console.log(`[WebSocket] Reconnecting in ${Math.round(delay / 1000)}s (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 
     setTimeout(() => {
       this.connect();

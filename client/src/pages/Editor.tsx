@@ -246,8 +246,8 @@ export const Editor = () => {
   useEffect(() => {
     if (!documentId) return;
 
-    // Get WebSocket URL from environment or use default
-    const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.host}/ws`;
+    // Get WebSocket URL from environment or use default (pointing to backend server)
+    const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:3000/ws`;
 
     // Connect to WebSocket with event handlers
     const manager = connectWebSocket(wsUrl, {
@@ -524,6 +524,7 @@ export const Editor = () => {
 
           <div className="editor-grid relative flex-1 overflow-y-auto dark:bg-[#0b0c18]">
             <EditorSurface
+              key={documentId || "no-doc"}
               documentId={documentId}
               content={editorContent}
               editable={isEditable}

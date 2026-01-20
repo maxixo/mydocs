@@ -68,6 +68,7 @@ export const EditorSurface = ({
     return getYjsProvider(documentId);
   }, [documentId]);
   const prevDocumentIdRef = useRef<string | null>(null);
+  const providerCleanupRef = useRef<(() => void) | null>(null);
   
   const syncManager = useMemo(
     () =>
@@ -143,6 +144,22 @@ export const EditorSurface = ({
     updateStats(editor);
   }, [editor, content, documentId, updateStats]);
 
+  // Cleanup provider when documentId changes
+  useEffect(() => {
+    if (prevDocumentIdRef.current && prevDocumentIdRef.current !== documentId) {
+      // Clean up previous provider
+      destroyYjsProvider(prevDocumentIdRef.current);
+    }
+    prevDocumentIdRef.current = documentId ?? null;
+
+    return () => {
+      // Cleanup on unmount
+      if (documentId) {
+        destroyYjsProvider(documentId);
+      }
+    };
+  }, [documentId]);
+
   useEffect(() => {
     if (!editor) {
       return;
@@ -160,8 +177,14 @@ export const EditorSurface = ({
     if (!syncManager) {
       return;
     }
-    syncManager.start();
+    
+    // Small delay to ensure editor is fully initialized
+    const timeoutId = setTimeout(() => {
+      syncManager.start();
+    }, 100);
+    
     return () => {
+      clearTimeout(timeoutId);
       syncManager.stop();
     };
   }, [syncManager]);
@@ -179,8 +202,13 @@ export const EditorSurface = ({
       onYjsUpdateRef.current(editor.getJSON() as JSONContent);
     };
 
-    provider.doc.on("update", handleYjsUpdate);
+    // Small delay to ensure provider is ready
+    const timeoutId = setTimeout(() => {
+      provider.doc.on("update", handleYjsUpdate);
+    }, 150);
+
     return () => {
+      clearTimeout(timeoutId);
       provider.doc.off("update", handleYjsUpdate);
     };
   }, [editor, provider]);
