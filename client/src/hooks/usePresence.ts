@@ -28,6 +28,10 @@ export const usePresence = (documentId?: string | null) => {
   }, [dispatch]);
 
   useEffect(() => {
+    dispatch(actions.setPresence({ collaborators: [], cursorPositions: new Map() }));
+  }, [documentId, dispatch]);
+
+  useEffect(() => {
     if (!documentId) {
       return;
     }
