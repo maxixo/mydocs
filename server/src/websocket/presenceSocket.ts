@@ -1,12 +1,15 @@
 import { WebSocket, WebSocketServer } from "ws";
 import { ClientEvent, ServerEvent } from "../../../shared/events.js";
 import { logger } from "../utils/logger.js";
+import { presenceManager } from "../collaboration/presenceManager.js";
 
 /**
  * Metadata for each WebSocket connection
  */
 interface SocketMetadata {
   userId: string;
+  name?: string;
+  image?: string;
   documentId?: string;
   workspaceId?: string;
 }
@@ -90,6 +93,17 @@ const handlePresenceUpdate = async (
       logger.warn(`User ${metadata.userId} sent presence for wrong document`);
       return;
     }
+
+    presenceManager.handleWebSocketPresenceUpdate({
+      documentId,
+      userInfo: {
+        id: metadata.userId,
+        name: metadata.name,
+        avatar: metadata.image
+      },
+      cursor: presence.cursor,
+      selection: presence.selection
+    });
 
     // Broadcast presence to all other users in same document
     broadcastPresence(documentId, presence, socket, socketMetadata);

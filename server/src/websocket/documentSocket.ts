@@ -9,6 +9,8 @@ import { getDocumentById } from "../services/document.service.js";
  */
 interface SocketMetadata {
   userId: string;
+  name?: string;
+  image?: string;
   documentId?: string;
   workspaceId?: string;
 }

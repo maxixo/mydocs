@@ -27,7 +27,7 @@ export const Editor = () => {
   // Store hooks
   const { recentDocuments, connectionStatus, saveStatus: globalSaveStatus, dispatch } = useAppStore();
   const isOnline = useOnlineStatus();
-  const { onlineCount, collaborators } = usePresence(id);
+  const { onlineCount, collaborators, sendCursorUpdate, sendSelectionUpdate } = usePresence(id);
   
   // Document hooks
   const { document, updateDocument, loading, error, saveStatus } = useDocument(id, workspaceId);
@@ -578,6 +578,8 @@ export const Editor = () => {
               onTitleChange={handleTitleChange}
               onStatsChange={setEditorStats}
               onYjsUpdate={handleYjsUpdate}
+              onCursorUpdate={sendCursorUpdate}
+              onSelectionUpdate={sendSelectionUpdate}
               autoFocusTitle={shouldFocusTitle}
               docTitle={docTitle}
               loading={loading}

@@ -44,6 +44,8 @@ type EditorSurfaceProps = {
   onTitleChange: (title: string) => void;
   onStatsChange?: (stats: EditorStats) => void;
   onYjsUpdate?: (content: JSONContent) => void;
+  onCursorUpdate?: (position: number, range?: { from: number; to: number }) => void;
+  onSelectionUpdate?: (selection: { from: number; to: number }) => void;
   autoFocusTitle?: boolean;
   loading?: boolean;
   error?: string | null;
@@ -57,6 +59,8 @@ export const EditorSurface = ({
   onTitleChange,
   onStatsChange,
   onYjsUpdate,
+  onCursorUpdate,
+  onSelectionUpdate,
   autoFocusTitle = false,
   docTitle,
   loading = false,
@@ -65,6 +69,8 @@ export const EditorSurface = ({
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const onStatsChangeRef = useRef(onStatsChange);
   const onYjsUpdateRef = useRef(onYjsUpdate);
+  const onCursorUpdateRef = useRef(onCursorUpdate);
+  const onSelectionUpdateRef = useRef(onSelectionUpdate);
   const [isEmpty, setIsEmpty] = useState(true);
   const didAutoFocusRef = useRef(false);
   const [providerState, setProviderState] = useState<ProviderState | null>(null);
@@ -92,6 +98,14 @@ export const EditorSurface = ({
   useEffect(() => {
     onYjsUpdateRef.current = onYjsUpdate;
   }, [onYjsUpdate]);
+
+  useEffect(() => {
+    onCursorUpdateRef.current = onCursorUpdate;
+  }, [onCursorUpdate]);
+
+  useEffect(() => {
+    onSelectionUpdateRef.current = onSelectionUpdate;
+  }, [onSelectionUpdate]);
 
   useEffect(() => {
     didAutoFocusRef.current = false;
@@ -145,6 +159,17 @@ export const EditorSurface = ({
         const nextContent = editorInstance.getJSON() as JSONContent;
         onChangeRef.current(nextContent);
         updateStats(editorInstance);
+      },
+      onSelectionUpdate: ({ editor: editorInstance }) => {
+        if (!documentId) {
+          return;
+        }
+        const { from, to } = editorInstance.state.selection;
+        if (from !== to) {
+          onSelectionUpdateRef.current?.({ from, to });
+        } else {
+          onCursorUpdateRef.current?.(from);
+        }
       }
     },
     [documentId, provider]

@@ -4,6 +4,8 @@ import { registerDocumentSocket } from "./documentSocket.js";
 import { registerPresenceSocket } from "./presenceSocket.js";
 import { logger } from "../utils/logger.js";
 import { getSessionUser } from "../middlewares/auth.middleware.js";
+import { presenceManager } from "../collaboration/presenceManager.js";
+import { ServerEvent } from "@shared/events.js";
 
 /**
  * WebSocket connection metadata
@@ -11,6 +13,8 @@ import { getSessionUser } from "../middlewares/auth.middleware.js";
  */
 interface SocketMetadata {
   userId: string;
+  name?: string;
+  image?: string;
   documentId?: string;
   workspaceId?: string;
 }
@@ -34,11 +38,43 @@ export const initWebSocketServer = (server: Server) => {
     path: "/ws"
   });
 
+  presenceManager.setWebSocketBroadcaster((payload) => {
+    const selection = payload.selection
+      ? { anchor: payload.selection.from, head: payload.selection.to }
+      : payload.cursor
+        ? { anchor: payload.cursor.position, head: payload.cursor.position }
+        : null;
+
+    const message = JSON.stringify({
+      type: ServerEvent.PresenceBroadcast,
+      payload: {
+        documentId: payload.documentId,
+        presence: {
+          userId: payload.userId,
+          cursor: null,
+          selection
+        }
+      }
+    });
+
+    wss.clients.forEach((client) => {
+      const metadata = socketMetadata.get(client);
+      if (!metadata || metadata.documentId !== payload.documentId) {
+        return;
+      }
+
+      if (payload.excludeUserId && metadata.userId === payload.excludeUserId) {
+        return;
+      }
+
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    });
+  });
+
   wss.on("connection", async (socket, request) => {
     try {
-      // Extract cookies from the HTTP request
-      const cookieHeader = request.headers.cookie;
-
       // Authenticate the WebSocket connection
       const user = await authenticateSocket(request);
       if (!user) {
@@ -52,7 +88,9 @@ export const initWebSocketServer = (server: Server) => {
 
       // Store user metadata with this socket
       socketMetadata.set(socket, {
-        userId: user.id
+        userId: user.id,
+        name: user.name,
+        image: user.image
       });
 
       logger.info(`WebSocket connected: ${user.id}`);
@@ -78,6 +116,7 @@ export const initWebSocketServer = (server: Server) => {
           // If user was in a document, notify other users
           if (metadata.documentId) {
             broadcastPresenceLeave(metadata.documentId, metadata.userId, wss);
+            presenceManager.handleDisconnect(metadata.documentId, metadata.userId);
           }
         }
         socketMetadata.delete(socket);
