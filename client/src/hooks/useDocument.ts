@@ -19,22 +19,90 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveCounterRef = useRef(0);
   const pendingSaveRef = useRef(0);
+  const currentDocumentIdRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const persistDocument = useCallback(
+    async (next: DocumentState, saveId: number) => {
+      if (!documentId || !workspaceId) {
+        return;
+      }
+
+      try {
+        await updateDocument({
+          id: documentId,
+          workspaceId,
+          title: next.title,
+          content: next.content
+        }, { signal: abortControllerRef.current?.signal });
+        if (pendingSaveRef.current === saveId) {
+          setSaveStatus("saved");
+          setSaveError(null);
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return;
+        }
+        if (pendingSaveRef.current === saveId) {
+          setSaveStatus("error");
+          setSaveError(err instanceof Error ? err.message : "Failed to save document");
+        }
+      }
+    },
+    [documentId, workspaceId]
+  );
+
+  const debouncedPersist = useMemo(() => {
+    return debounce((next: DocumentState, saveId: number) => {
+      void persistDocument(next, saveId);
+    }, DEFAULT_AUTOSAVE_MS);
+  }, [persistDocument]);
+
+  const debouncedIndexUpdate = useMemo(() => {
+    return debounce((next: DocumentState) => {
+      void indexDocument(next);
+    }, DEFAULT_AUTOSAVE_MS);
+  }, [indexDocument]);
+
+  const cancelPendingSave = useCallback(() => {
+    debouncedPersist.cancel?.();
+    debouncedIndexUpdate.cancel?.();
+    pendingSaveRef.current = 0;
+  }, [debouncedIndexUpdate, debouncedPersist]);
 
   useEffect(() => {
     let isMounted = true;
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const nextController = new AbortController();
+    abortControllerRef.current = nextController;
+    currentDocumentIdRef.current = documentId ?? null;
+
+    setSaveStatus("idle");
+    setSaveError(null);
+    saveCounterRef.current = 0;
+    pendingSaveRef.current = 0;
+    cancelPendingSave();
+
     const loadDocument = async () => {
       if (!documentId || !workspaceId) {
+        if (isMounted) {
+          setDocument(null);
+          setLoading(false);
+          setError(null);
+        }
         return;
       }
 
       setLoading(true);
       setError(null);
-      setSaveStatus("idle");
-      setSaveError(null);
 
       try {
-        const result = await fetchDocumentById(documentId, workspaceId);
+        const result = await fetchDocumentById(documentId, workspaceId, {
+          signal: nextController.signal
+        });
         if (!isMounted) {
           return;
         }
@@ -68,6 +136,9 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
         void cacheDocument(nextDocument).catch(() => undefined);
         void indexDocument(nextDocument);
       } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return;
+        }
         if (isMounted) {
           setError(err instanceof Error ? err.message : "Failed to load document");
         }
@@ -82,47 +153,12 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
 
     return () => {
       isMounted = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      cancelPendingSave();
     };
-  }, [documentId, workspaceId]);
-
-  const persistDocument = useCallback(
-    async (next: DocumentState, saveId: number) => {
-      if (!documentId || !workspaceId) {
-        return;
-      }
-
-      try {
-        await updateDocument({
-          id: documentId,
-          workspaceId,
-          title: next.title,
-          content: next.content
-        });
-        if (pendingSaveRef.current === saveId) {
-          setSaveStatus("saved");
-          setSaveError(null);
-        }
-      } catch (err) {
-        if (pendingSaveRef.current === saveId) {
-          setSaveStatus("error");
-          setSaveError(err instanceof Error ? err.message : "Failed to save document");
-        }
-      }
-    },
-    [documentId, workspaceId]
-  );
-
-  const debouncedPersist = useMemo(() => {
-    return debounce((next: DocumentState, saveId: number) => {
-      void persistDocument(next, saveId);
-    }, DEFAULT_AUTOSAVE_MS);
-  }, [persistDocument]);
-
-  const debouncedIndexUpdate = useMemo(() => {
-    return debounce((next: DocumentState) => {
-      void indexDocument(next);
-    }, DEFAULT_AUTOSAVE_MS);
-  }, [indexDocument]);
+  }, [documentId, workspaceId, cancelPendingSave]);
 
   const updateDocumentState = useCallback(
     (next: DocumentState) => {

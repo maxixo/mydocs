@@ -59,14 +59,15 @@ export const fetchDocuments = async (workspaceId: string): Promise<DocumentSumma
 
 export const fetchDocumentById = async (
   id: string,
-  workspaceId: string
+  workspaceId: string,
+  options?: { signal?: AbortSignal }
 ): Promise<DocumentDetail | null> => {
   try {
     const response = await fetch(
       `${API_BASE_URL}/api/documents/${encodeURIComponent(id)}?workspaceId=${encodeURIComponent(
         workspaceId
       )}`,
-      { credentials: "include" }
+      { credentials: "include", signal: options?.signal }
     );
 
     if (response.status === 404) {
@@ -111,7 +112,7 @@ export const updateDocument = async (payload: {
   workspaceId: string;
   title?: string;
   content?: TipTapContent;
-}): Promise<DocumentDetail> => {
+}, options?: { signal?: AbortSignal }): Promise<DocumentDetail> => {
   const response = await fetch(
     `${API_BASE_URL}/api/documents/${encodeURIComponent(payload.id)}?workspaceId=${encodeURIComponent(
       payload.workspaceId
@@ -120,6 +121,7 @@ export const updateDocument = async (payload: {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
+      signal: options?.signal,
       body: JSON.stringify({
         title: payload.title,
         content: payload.content

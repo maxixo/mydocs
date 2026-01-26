@@ -4,8 +4,14 @@ export const debounce = <Args extends unknown[]>(
 ) => {
   let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
 
-  return (...args: Args) => {
+  const debounced = (...args: Args) => {
     window.clearTimeout(timeoutId);
     timeoutId = window.setTimeout(() => fn(...args), delayMs);
   };
+
+  debounced.cancel = () => {
+    window.clearTimeout(timeoutId);
+  };
+
+  return debounced;
 };

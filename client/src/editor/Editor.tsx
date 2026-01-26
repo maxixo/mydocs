@@ -3,7 +3,7 @@ import { BubbleMenu, EditorContent, useEditor } from "@tiptap/react";
 import type { Editor as TipTapEditor, JSONContent } from "@tiptap/core";
 import { createEditorExtensions } from "./editorConfig";
 import { Toolbar } from "./Toolbar";
-import { getYjsProvider, destroyYjsProvider } from "../collaboration/yjsProvider";
+import { getYjsProvider, resetProvider, type YjsProvider } from "../collaboration/yjsProvider";
 import { createSyncManager } from "../collaboration/syncManager";
 import { EMPTY_TIPTAP_DOC, sanitizeTipTapContent } from "../utils/tiptapContent";
 
@@ -16,6 +16,11 @@ const DEFAULT_USER = {
 type EditorStats = {
   wordCount: number;
   charCount: number;
+};
+
+type ProviderState = {
+  documentId: string;
+  provider: YjsProvider;
 };
 
 const getTextStats = (value: string): EditorStats => {
@@ -61,14 +66,9 @@ export const EditorSurface = ({
   const onYjsUpdateRef = useRef(onYjsUpdate);
   const [isEmpty, setIsEmpty] = useState(true);
   const didAutoFocusRef = useRef(false);
-  const provider = useMemo(() => {
-    if (!documentId) {
-      return null;
-    }
-    return getYjsProvider(documentId);
-  }, [documentId]);
-  const prevDocumentIdRef = useRef<string | null>(null);
-  const providerCleanupRef = useRef<(() => void) | null>(null);
+  const [providerState, setProviderState] = useState<ProviderState | null>(null);
+  const provider =
+    providerState && providerState.documentId === documentId ? providerState.provider : null;
   
   const syncManager = useMemo(
     () =>
@@ -96,6 +96,25 @@ export const EditorSurface = ({
     didAutoFocusRef.current = false;
   }, [documentId]);
 
+  useEffect(() => {
+    if (!documentId) {
+      setProviderState(null);
+      return;
+    }
+
+    const nextProvider = getYjsProvider(documentId);
+    setProviderState({ documentId, provider: nextProvider });
+
+    return () => {
+      resetProvider(documentId);
+    };
+  }, [documentId]);
+
+  useEffect(() => {
+    lastHydratedKey.current = null;
+    setIsEmpty(true);
+  }, [documentId]);
+
   const updateStats = useCallback(
     (editorInstance: TipTapEditor) => {
       const bodyStats = getTextStats(editorInstance.getText());
@@ -106,26 +125,41 @@ export const EditorSurface = ({
     [docTitle]
   );
 
-  const editor = useEditor({
-    extensions: createEditorExtensions(
-      provider
-        ? {
-            collaboration: {
-              doc: provider.doc,
-              awareness: provider.awareness,
-              user: DEFAULT_USER
+  const editor = useEditor(
+    {
+      extensions: createEditorExtensions(
+        provider
+          ? {
+              collaboration: {
+                doc: provider.doc,
+                awareness: provider.awareness,
+                user: DEFAULT_USER
+              }
             }
-          }
-        : undefined
-    ),
-    content: EMPTY_TIPTAP_DOC,
-    editable,
-    onUpdate: ({ editor: editorInstance }) => {
-      const nextContent = editorInstance.getJSON() as JSONContent;
-      onChangeRef.current(nextContent);
-      updateStats(editorInstance);
+          : undefined
+      ),
+      content: EMPTY_TIPTAP_DOC,
+      editable,
+      onUpdate: ({ editor: editorInstance }) => {
+        const nextContent = editorInstance.getJSON() as JSONContent;
+        onChangeRef.current(nextContent);
+        updateStats(editorInstance);
+      }
+    },
+    [documentId, provider]
+  );
+
+  useEffect(() => {
+    if (!editor) {
+      return;
     }
-  });
+
+    return () => {
+      if (!editor.isDestroyed) {
+        editor.destroy();
+      }
+    };
+  }, [documentId, editor]);
 
   useEffect(() => {
     if (!editor) {
@@ -143,22 +177,6 @@ export const EditorSurface = ({
     lastHydratedKey.current = hydrationKey;
     updateStats(editor);
   }, [editor, content, documentId, updateStats]);
-
-  // Cleanup provider when documentId changes
-  useEffect(() => {
-    if (prevDocumentIdRef.current && prevDocumentIdRef.current !== documentId) {
-      // Clean up previous provider
-      destroyYjsProvider(prevDocumentIdRef.current);
-    }
-    prevDocumentIdRef.current = documentId ?? null;
-
-    return () => {
-      // Cleanup on unmount
-      if (documentId) {
-        destroyYjsProvider(documentId);
-      }
-    };
-  }, [documentId]);
 
   useEffect(() => {
     if (!editor) {

@@ -241,10 +241,26 @@ export const Editor = () => {
 
   // WebSocket and collaboration state
   const wsManagerRef = useRef<WebSocketManager | null>(null);
+  const activeRoomRef = useRef<{ documentId: string; workspaceId: string } | null>(null);
 
   // Initialize WebSocket connection for collaboration
   useEffect(() => {
-    if (!documentId) return;
+    if (!documentId || !workspaceId) {
+      activeRoomRef.current = null;
+      if (wsManagerRef.current) {
+        wsManagerRef.current.disconnect();
+      }
+      return;
+    }
+
+    if (
+      activeRoomRef.current &&
+      (activeRoomRef.current.documentId !== documentId ||
+        activeRoomRef.current.workspaceId !== workspaceId)
+    ) {
+      wsManagerRef.current?.disconnect();
+      activeRoomRef.current = null;
+    }
 
     // Get WebSocket URL from environment or use default (pointing to backend server)
     const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:3000/ws`;
@@ -255,10 +271,16 @@ export const Editor = () => {
         console.log("WebSocket ready:", payload);
       },
       onSyncResponse: (payload: ServerSyncResponsePayload) => {
+        if (activeRoomRef.current?.documentId !== payload.document.id) {
+          return;
+        }
         console.log("Document synced:", payload.document);
         setServerVersion(payload.document.content as JSONContent);
       },
       onPresenceBroadcast: (payload: ServerPresenceBroadcastPayload) => {
+        if (activeRoomRef.current?.documentId !== payload.documentId) {
+          return;
+        }
         console.log("Presence update:", payload.presence);
       },
       onError: (payload) => {
@@ -268,19 +290,37 @@ export const Editor = () => {
 
     wsManagerRef.current = manager;
 
-    // Join document room when connected
-    const checkConnection = setInterval(() => {
-      if (manager.isConnected() && documentId && workspaceId) {
-        manager.send(ClientEvent.DocumentOpen, {
-          documentId,
-          workspaceId
-        });
-        clearInterval(checkConnection);
+    const joinRoom = () => {
+      if (!manager.isConnected()) {
+        return;
       }
-    }, 100);
+      manager.send(ClientEvent.DocumentOpen, {
+        documentId,
+        workspaceId
+      });
+      activeRoomRef.current = { documentId, workspaceId };
+    };
+
+    // Join document room when connected
+    let checkConnection: number | null = null;
+    if (manager.isConnected()) {
+      joinRoom();
+    } else {
+      checkConnection = window.setInterval(() => {
+        joinRoom();
+        if (activeRoomRef.current?.documentId === documentId) {
+          if (checkConnection !== null) {
+            clearInterval(checkConnection);
+            checkConnection = null;
+          }
+        }
+      }, 100);
+    }
 
     return () => {
-      clearInterval(checkConnection);
+      if (checkConnection !== null) {
+        clearInterval(checkConnection);
+      }
     };
   }, [documentId, workspaceId]);
 
