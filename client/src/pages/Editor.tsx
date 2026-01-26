@@ -239,6 +239,12 @@ export const Editor = () => {
   const isEditable = Boolean(document) && !loading && !error;
   const searchActive = searchQuery.trim().length > 0;
 
+  useEffect(() => {
+    setShowConflictModal(false);
+    setLocalVersion(EMPTY_TIPTAP_DOC);
+    setServerVersion(EMPTY_TIPTAP_DOC);
+  }, [documentId]);
+
   // WebSocket and collaboration state
   const wsManagerRef = useRef<WebSocketManager | null>(null);
   const activeRoomRef = useRef<{ documentId: string; workspaceId: string } | null>(null);

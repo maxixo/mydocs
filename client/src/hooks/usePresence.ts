@@ -36,8 +36,13 @@ export const usePresence = (documentId?: string | null) => {
       return;
     }
 
-    // Subscribe to WebSocket presence events
-    const eventSource = new EventSource(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'}/api/presence/${documentId}`);
+    const presenceBaseUrl = import.meta.env.VITE_PRESENCE_SSE_URL;
+    if (!presenceBaseUrl) {
+      return;
+    }
+
+    const normalizedBaseUrl = presenceBaseUrl.replace(/\/$/, "");
+    const eventSource = new EventSource(`${normalizedBaseUrl}/api/presence/${documentId}`);
 
     eventSource.onmessage = (event) => {
       try {

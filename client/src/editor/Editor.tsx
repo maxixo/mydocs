@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { BubbleMenu, EditorContent, useEditor } from "@tiptap/react";
+import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor as TipTapEditor, JSONContent } from "@tiptap/core";
 import { createEditorExtensions } from "./editorConfig";
 import { Toolbar } from "./Toolbar";
 import { getYjsProvider, resetProvider, type YjsProvider } from "../collaboration/yjsProvider";
 import { createSyncManager } from "../collaboration/syncManager";
 import { EMPTY_TIPTAP_DOC, sanitizeTipTapContent } from "../utils/tiptapContent";
+import { BubbleMenuPortal } from "./BubbleMenuPortal";
 
 const DEFAULT_USER = {
   userId: "local-user",
@@ -149,20 +150,10 @@ export const EditorSurface = ({
     [documentId, provider]
   );
 
-  useEffect(() => {
-    if (!editor) {
-      return;
-    }
-
-    return () => {
-      if (!editor.isDestroyed) {
-        editor.destroy();
-      }
-    };
-  }, [documentId, editor]);
+  const safeEditor = documentId ? editor : null;
 
   useEffect(() => {
-    if (!editor) {
+    if (!safeEditor) {
       return;
     }
 
@@ -172,24 +163,24 @@ export const EditorSurface = ({
     }
 
     const safeContent = sanitizeTipTapContent(content ?? EMPTY_TIPTAP_DOC);
-    editor.commands.setContent(safeContent, false);
-    editor.commands.focus("end");
+    safeEditor.commands.setContent(safeContent, false);
+    safeEditor.commands.focus("end");
     lastHydratedKey.current = hydrationKey;
-    updateStats(editor);
-  }, [editor, content, documentId, updateStats]);
+    updateStats(safeEditor);
+  }, [safeEditor, content, documentId, updateStats]);
 
   useEffect(() => {
-    if (!editor) {
+    if (!safeEditor) {
       return;
     }
-    updateStats(editor);
-  }, [docTitle, editor, updateStats]);
+    updateStats(safeEditor);
+  }, [docTitle, safeEditor, updateStats]);
 
   useEffect(() => {
-    if (editor) {
-      editor.setEditable(editable);
+    if (safeEditor) {
+      safeEditor.setEditable(editable);
     }
-  }, [editor, editable]);
+  }, [safeEditor, editable]);
 
   useEffect(() => {
     if (!syncManager) {
@@ -209,7 +200,7 @@ export const EditorSurface = ({
 
 
   useEffect(() => {
-    if (!provider || !editor) {
+    if (!provider || !safeEditor) {
       return;
     }
 
@@ -217,7 +208,7 @@ export const EditorSurface = ({
       if (!onYjsUpdateRef.current) {
         return;
       }
-      onYjsUpdateRef.current(editor.getJSON() as JSONContent);
+      onYjsUpdateRef.current(safeEditor.getJSON() as JSONContent);
     };
 
     // Small delay to ensure provider is ready
@@ -229,7 +220,7 @@ export const EditorSurface = ({
       clearTimeout(timeoutId);
       provider.doc.off("update", handleYjsUpdate);
     };
-  }, [editor, provider]);
+  }, [provider, safeEditor]);
 
   useEffect(() => {
     if (!autoFocusTitle || !editable || !titleInputRef.current || didAutoFocusRef.current) {
@@ -246,16 +237,16 @@ export const EditorSurface = ({
         return;
       }
       event.preventDefault();
-      editor?.commands.focus("start");
+      safeEditor?.commands.focus("start");
     },
-    [editor]
+    [safeEditor]
   );
 
   const handleSetLink = useCallback(() => {
-    if (!editor) {
+    if (!safeEditor) {
       return;
     }
-    const previousUrl = editor.getAttributes("link").href as string | undefined;
+    const previousUrl = safeEditor.getAttributes("link").href as string | undefined;
     const nextUrl = window.prompt("Enter URL", previousUrl ?? "");
 
     if (nextUrl === null) {
@@ -264,12 +255,12 @@ export const EditorSurface = ({
 
     const trimmed = nextUrl.trim();
     if (!trimmed) {
-      editor.chain().focus().extendMarkRange("link").unsetMark("link").run();
+      safeEditor.chain().focus().extendMarkRange("link").unsetMark("link").run();
       return;
     }
 
-    editor.chain().focus().extendMarkRange("link").setMark("link", { href: trimmed }).run();
-  }, [editor]);
+    safeEditor.chain().focus().extendMarkRange("link").setMark("link", { href: trimmed }).run();
+  }, [safeEditor]);
 
   const showEmptyHint = editable && !loading && !error && isEmpty;
 
@@ -277,7 +268,7 @@ export const EditorSurface = ({
     <>
       <div className="pointer-events-none sticky top-6 z-30 flex justify-center">
         <div className="pointer-events-auto">
-          <Toolbar editor={editor} />
+          <Toolbar editor={safeEditor} />
         </div>
       </div>
 
@@ -299,9 +290,9 @@ export const EditorSurface = ({
               onKeyDown={handleTitleKeyDown}
             />
           </div>
-          {editor && editable ? (
-            <BubbleMenu
-              editor={editor}
+          {safeEditor && editable ? (
+            <BubbleMenuPortal
+              editor={safeEditor}
               tippyOptions={{ duration: 150, placement: "top", offset: [0, 8] }}
               shouldShow={({ editor: activeEditor }) =>
                 activeEditor.isEditable && !activeEditor.state.selection.empty
@@ -311,29 +302,29 @@ export const EditorSurface = ({
               <button
                 type="button"
                 className={`rounded px-2 py-1 text-sm font-semibold transition-colors ${
-                  editor.isActive("bold")
+                  safeEditor.isActive("bold")
                     ? "bg-[#0d0e1b] text-white"
                     : "text-[#0d0e1b] hover:bg-[#e7e7f3]"
                 }`}
-                onClick={() => editor.chain().focus().toggleBold().run()}
+                onClick={() => safeEditor.chain().focus().toggleBold().run()}
               >
                 B
               </button>
               <button
                 type="button"
                 className={`rounded px-2 py-1 text-sm font-semibold transition-colors ${
-                  editor.isActive("italic")
+                  safeEditor.isActive("italic")
                     ? "bg-[#0d0e1b] text-white"
                     : "text-[#0d0e1b] hover:bg-[#e7e7f3]"
                 }`}
-                onClick={() => editor.chain().focus().toggleItalic().run()}
+                onClick={() => safeEditor.chain().focus().toggleItalic().run()}
               >
                 I
               </button>
               <button
                 type="button"
                 className={`rounded px-2 py-1 text-sm font-semibold transition-colors ${
-                  editor.isActive("link")
+                  safeEditor.isActive("link")
                     ? "bg-[#0d0e1b] text-white"
                     : "text-[#0d0e1b] hover:bg-[#e7e7f3]"
                 }`}
@@ -341,15 +332,15 @@ export const EditorSurface = ({
               >
                 Link
               </button>
-            </BubbleMenu>
+            </BubbleMenuPortal>
           ) : null}
           {loading ? (
             <p className="text-base text-[#4c4d9a] dark:text-[#8a8bbd]">Loading document...</p>
           ) : error ? (
             <p className="text-base text-red-500">{error}</p>
-          ) : (
+          ) : safeEditor && documentId ? (
             <div className="relative">
-              <EditorContent editor={editor} className="tiptap text-lg leading-relaxed" />
+              <EditorContent editor={safeEditor} className="tiptap text-lg leading-relaxed" />
               <div
                 className={`pointer-events-none absolute left-0 top-0 text-lg text-[#8a8bbd] transition-opacity duration-200 ${
                   showEmptyHint ? "opacity-70" : "opacity-0"
@@ -358,7 +349,7 @@ export const EditorSurface = ({
                 Start typing...
               </div>
             </div>
-          )}
+          ) : null}
         </article>
 
       </div>
