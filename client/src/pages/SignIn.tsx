@@ -2,10 +2,12 @@ import { useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { OAuthGoogleButton } from "./OAuthGoogleButton";
 import { signInWithEmail } from "../services/auth.service";
+import { useAuth } from "../auth/AuthContext";
 
 export const SignIn = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { refresh } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -21,6 +23,7 @@ export const SignIn = () => {
       const result = await signInWithEmail(email, password);
       localStorage.setItem("auth_token", result.token);
       localStorage.setItem("auth_provider", "better-auth");
+      await refresh();
       const redirectTo =
         (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/editor/recent";
       navigate(redirectTo, { replace: true });

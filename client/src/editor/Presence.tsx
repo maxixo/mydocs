@@ -1,11 +1,16 @@
-import { usePresence } from "../hooks/usePresence";
+type PresenceProps = {
+  onlineCount: number;
+  className?: string;
+};
 
-export const Presence = () => {
-  const presence = usePresence();
+export const Presence = ({ onlineCount, className }: PresenceProps) => {
+  if (onlineCount <= 0) {
+    return null;
+  }
 
   return (
-    <div className="editor-presence">
-      <span>Online collaborators: {presence.onlineCount}</span>
-    </div>
+    <span className={className ?? "editor-presence"}>
+      {onlineCount} {onlineCount === 1 ? "collaborator" : "collaborators"} online
+    </span>
   );
 };

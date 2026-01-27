@@ -19,6 +19,15 @@ type CursorUpdatePayload = {
 
 const normalizeBaseUrl = (baseUrl: string) => baseUrl.replace(/\/$/, "");
 
+const getAuthHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = {};
+  const token = localStorage.getItem("auth_token");
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+};
+
 export const usePresence = (documentId?: string | null) => {
   const { presence, connectionStatus, dispatch } = useAppStore();
   const { collaborators, cursorPositions } = presence;
@@ -26,10 +35,12 @@ export const usePresence = (documentId?: string | null) => {
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
 
-  const apiBaseUrl =
-    import.meta.env.VITE_API_BASE_URL?.trim() || window.location.origin;
+  const presenceBaseUrl =
+    import.meta.env.VITE_PRESENCE_SSE_URL?.trim() ||
+    import.meta.env.VITE_API_BASE_URL?.trim() ||
+    window.location.origin;
   const sseBaseUrl =
-    import.meta.env.VITE_PRESENCE_SSE_URL?.trim() || apiBaseUrl;
+    import.meta.env.VITE_PRESENCE_SSE_URL?.trim() || presenceBaseUrl;
 
   const handlePresenceUpdate = useCallback(
     (presenceData: PresenceSnapshotPayload) => {
@@ -80,12 +91,12 @@ export const usePresence = (documentId?: string | null) => {
       }
 
       try {
-        const baseUrl = normalizeBaseUrl(apiBaseUrl);
+        const baseUrl = normalizeBaseUrl(presenceBaseUrl);
         const response = await fetch(
           `${baseUrl}/api/presence/${encodeURIComponent(documentId)}/${path}`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...getAuthHeaders() },
             credentials: "include",
             body: payload ? JSON.stringify(payload) : undefined
           }
@@ -96,7 +107,7 @@ export const usePresence = (documentId?: string | null) => {
         return false;
       }
     },
-    [apiBaseUrl, documentId]
+    [presenceBaseUrl, documentId]
   );
 
   useEffect(() => {
@@ -215,18 +226,6 @@ export const usePresence = (documentId?: string | null) => {
       dispatch(actions.setPresence({ collaborators: [], cursorPositions: new Map() }));
     }
   }, [connectionStatus, dispatch]);
-
-  useEffect(() => {
-    if (!documentId) {
-      return;
-    }
-
-    void sendPresenceUpdate("join");
-
-    return () => {
-      void sendPresenceUpdate("leave");
-    };
-  }, [documentId, sendPresenceUpdate]);
 
   return {
     onlineCount: collaborators.length,

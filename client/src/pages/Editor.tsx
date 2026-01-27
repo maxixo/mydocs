@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { JSONContent } from "@tiptap/core";
 import { EditorSurface } from "../editor/Editor";
+import { Presence } from "../editor/Presence";
 import { useDocument } from "../hooks/useDocument";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { usePresence } from "../hooks/usePresence";
@@ -537,11 +538,7 @@ export const Editor = () => {
                     </div>
                   )}
                 </div>
-                {onlineCount > 0 && (
-                  <span className="ml-3 text-xs text-[#4c4d9a]">
-                    {onlineCount} {onlineCount === 1 ? 'collaborator' : 'collaborators'} online
-                  </span>
-                )}
+                <Presence onlineCount={onlineCount} className="ml-3 text-xs text-[#4c4d9a]" />
               </div>
               <div className="h-6 w-px bg-[#e7e7f3] dark:bg-[#2d2e4a]"></div>
               <div className="flex items-center gap-2">

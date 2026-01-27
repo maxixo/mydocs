@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { router } from "./app/routes";
 import { AppProvider } from "./app/store";
+import { AuthProvider } from "./auth/AuthContext";
 import "./main.css";
 import { registerServiceWorker } from "./workers/serviceWorker";
 
@@ -12,9 +13,11 @@ if (!rootElement) {
 }
 
 createRoot(rootElement).render(
-  <AppProvider>
-    <RouterProvider router={router} />
-  </AppProvider>
+  <AuthProvider>
+    <AppProvider>
+      <RouterProvider router={router} />
+    </AppProvider>
+  </AuthProvider>
 );
 
 registerServiceWorker();

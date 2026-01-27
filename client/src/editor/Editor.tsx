@@ -5,13 +5,26 @@ import { createEditorExtensions } from "./editorConfig";
 import { Toolbar } from "./Toolbar";
 import { getYjsProvider, resetProvider, type YjsProvider } from "../collaboration/yjsProvider";
 import { createSyncManager } from "../collaboration/syncManager";
+import { useAuth } from "../auth/AuthContext";
+import { joinDocument, leaveDocument } from "../services/presence.service";
+import { debounce } from "../utils/debounce";
 import { EMPTY_TIPTAP_DOC, sanitizeTipTapContent } from "../utils/tiptapContent";
 import { BubbleMenuPortal } from "./BubbleMenuPortal";
+
+const CURSOR_COLORS = ["#22c55e", "#3b82f6", "#f97316", "#ec4899", "#a855f7", "#14b8a6"];
+
+const getCursorColor = (seed: string) => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return CURSOR_COLORS[hash % CURSOR_COLORS.length];
+};
 
 const DEFAULT_USER = {
   userId: "local-user",
   name: "You",
-  color: "#22c55e"
+  color: CURSOR_COLORS[0]
 };
 
 type EditorStats = {
@@ -71,21 +84,53 @@ export const EditorSurface = ({
   const onYjsUpdateRef = useRef(onYjsUpdate);
   const onCursorUpdateRef = useRef(onCursorUpdate);
   const onSelectionUpdateRef = useRef(onSelectionUpdate);
+  const { user: authUser, status: authStatus } = useAuth();
   const [isEmpty, setIsEmpty] = useState(true);
   const didAutoFocusRef = useRef(false);
   const [providerState, setProviderState] = useState<ProviderState | null>(null);
   const provider =
     providerState && providerState.documentId === documentId ? providerState.provider : null;
-  
+
+  const presenceUserId = authStatus === "authenticated" ? authUser?.id ?? null : null;
+  const presenceName = authUser?.name ?? authUser?.email ?? "Anonymous";
+  const presenceAvatar = authUser?.image ?? undefined;
+
+  const awarenessUser = useMemo(() => {
+    if (presenceUserId) {
+      return {
+        userId: presenceUserId,
+        name: presenceName,
+        color: getCursorColor(presenceUserId)
+      };
+    }
+    return DEFAULT_USER;
+  }, [presenceUserId, presenceName]);
+
+  const collaborationUser = useMemo(
+    () => ({
+      name: awarenessUser.name,
+      color: awarenessUser.color
+    }),
+    [awarenessUser.name, awarenessUser.color]
+  );
+
   const syncManager = useMemo(
     () =>
       provider ? createSyncManager(provider, {
-        user: DEFAULT_USER
+        user: awarenessUser
       }) : null,
-    [provider]
+    [provider, awarenessUser]
   );
   const onChangeRef = useRef(onChange);
   const lastHydratedKey = useRef<string | null>(null);
+
+  const debouncedCursorUpdate = useMemo(
+    () =>
+      debounce((position: number, range?: { from: number; to: number }) => {
+        onCursorUpdateRef.current?.(position, range);
+      }, 120),
+    []
+  );
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -108,6 +153,12 @@ export const EditorSurface = ({
   }, [onSelectionUpdate]);
 
   useEffect(() => {
+    return () => {
+      debouncedCursorUpdate.cancel();
+    };
+  }, [debouncedCursorUpdate, documentId]);
+
+  useEffect(() => {
     didAutoFocusRef.current = false;
   }, [documentId]);
 
@@ -124,6 +175,18 @@ export const EditorSurface = ({
       resetProvider(documentId);
     };
   }, [documentId]);
+
+  useEffect(() => {
+    if (!documentId || !presenceUserId) {
+      return;
+    }
+
+    void joinDocument(documentId, presenceUserId, presenceName, presenceAvatar).catch(() => {});
+
+    return () => {
+      void leaveDocument(documentId, presenceUserId).catch(() => {});
+    };
+  }, [documentId, presenceUserId, presenceName, presenceAvatar]);
 
   useEffect(() => {
     lastHydratedKey.current = null;
@@ -148,7 +211,7 @@ export const EditorSurface = ({
               collaboration: {
                 doc: provider.doc,
                 awareness: provider.awareness,
-                user: DEFAULT_USER
+                user: collaborationUser
               }
             }
           : undefined
@@ -166,9 +229,10 @@ export const EditorSurface = ({
         }
         const { from, to } = editorInstance.state.selection;
         if (from !== to) {
+          debouncedCursorUpdate.cancel();
           onSelectionUpdateRef.current?.({ from, to });
         } else {
-          onCursorUpdateRef.current?.(from);
+          debouncedCursorUpdate(from);
         }
       }
     },
@@ -176,6 +240,17 @@ export const EditorSurface = ({
   );
 
   const safeEditor = documentId ? editor : null;
+
+  useEffect(() => {
+    if (!safeEditor || !provider) {
+      return;
+    }
+
+    safeEditor.commands.updateUser({
+      name: collaborationUser.name,
+      color: collaborationUser.color
+    });
+  }, [safeEditor, provider, collaborationUser.name, collaborationUser.color]);
 
   useEffect(() => {
     if (!safeEditor) {
