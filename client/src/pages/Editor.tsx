@@ -16,6 +16,18 @@ import { connectWebSocket, type WebSocketManager } from "../websocket/socket.js"
 import { ClientEvent } from "@shared/events";
 import type { ServerSyncResponsePayload, ServerPresenceBroadcastPayload } from "@shared/types";
 import { ConflictModal } from "../components/ConflictModal";
+import { ShareModal } from "../components/ShareModal";
+
+const isCollaborationParam = (value: string | null) => {
+  if (value === null) {
+    return false;
+  }
+  if (value === "") {
+    return true;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+};
 
 export const Editor = () => {
   const emptyContent: JSONContent = EMPTY_TIPTAP_DOC;
@@ -24,15 +36,24 @@ export const Editor = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const workspaceId = searchParams.get("workspaceId") ?? "default";
+  const collaborationRequested =
+    (location.state as { collaboration?: boolean } | null)?.collaboration === true ||
+    isCollaborationParam(searchParams.get("share")) ||
+    isCollaborationParam(searchParams.get("shared")) ||
+    isCollaborationParam(searchParams.get("collab")) ||
+    isCollaborationParam(searchParams.get("collaboration"));
   
   // Store hooks
   const { recentDocuments, connectionStatus, saveStatus: globalSaveStatus, dispatch } = useAppStore();
   const isOnline = useOnlineStatus();
-  const { onlineCount, collaborators, sendCursorUpdate, sendSelectionUpdate } = usePresence(id);
+  const [collaborationDocs, setCollaborationDocs] = useState<Record<string, boolean>>({});
+  const presenceDocumentId = id && (collaborationDocs[id] || collaborationRequested) ? id : null;
+  const { onlineCount, collaborators, sendCursorUpdate, sendSelectionUpdate } = usePresence(presenceDocumentId);
   
   // Document hooks
   const { document, updateDocument, loading, error, saveStatus } = useDocument(id, workspaceId);
-  const documentRef = useRef(document);
+  const activeDocument = id ? (document?.id === id ? document : null) : document;
+  const documentRef = useRef(activeDocument);
   const updateDocumentRef = useRef(updateDocument);
   
   // UI State
@@ -47,10 +68,13 @@ export const Editor = () => {
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [localVersion, setLocalVersion] = useState<JSONContent>(EMPTY_TIPTAP_DOC);
   const [serverVersion, setServerVersion] = useState<JSONContent>(EMPTY_TIPTAP_DOC);
+
+  // Share Modal State
+  const [showShareModal, setShowShareModal] = useState(false);
   
   // Display helpers
   const fallbackTitle = id ? id.replace(/-/g, " ") : "Untitled document";
-  const docTitle = document?.title ?? fallbackTitle;
+  const docTitle = activeDocument?.title ?? fallbackTitle;
   const displayTitle = docTitle.trim().length > 0 ? docTitle : "Untitled document";
   const shouldFocusTitle = Boolean((location.state as { focusTitle?: boolean } | null)?.focusTitle);
   
@@ -101,8 +125,8 @@ export const Editor = () => {
   const saveClass = displaySaveStatus === "error" || displaySaveStatus === "conflict" ? "text-red-500" : "text-[#4c4d9a]";
 
   useEffect(() => {
-    documentRef.current = document;
-  }, [document]);
+    documentRef.current = activeDocument;
+  }, [activeDocument]);
 
   useEffect(() => {
     updateDocumentRef.current = updateDocument;
@@ -209,6 +233,21 @@ export const Editor = () => {
     }
   }, [emptyContent, isCreating, navigate, workspaceId]);
 
+  const documentId = id ?? activeDocument?.id ?? null;
+
+  const handleShareClick = useCallback(() => {
+    if (!documentId) {
+      return;
+    }
+    setShowShareModal(true);
+    setCollaborationDocs((previous) => {
+      if (previous[documentId]) {
+        return previous;
+      }
+      return { ...previous, [documentId]: true };
+    });
+  }, [documentId]);
+
   // Conflict resolution handlers
   const handleKeepLocal = useCallback(() => {
     // Force save local version to server
@@ -235,10 +274,24 @@ export const Editor = () => {
     setShowConflictModal(false);
   }, []);
 
-  const documentId = document?.id ?? id ?? null;
-  const editorContent = (document?.content as JSONContent) ?? emptyContent;
-  const isEditable = Boolean(document) && !loading && !error;
+  const editorContent = (activeDocument?.content as JSONContent) ?? emptyContent;
+  const isEditable = Boolean(activeDocument) && !loading && !error;
   const searchActive = searchQuery.trim().length > 0;
+  const collaborationEnabled = Boolean(
+    documentId && (collaborationDocs[documentId] || collaborationRequested)
+  );
+
+  useEffect(() => {
+    if (!documentId || !collaborationRequested) {
+      return;
+    }
+    setCollaborationDocs((previous) => {
+      if (previous[documentId]) {
+        return previous;
+      }
+      return { ...previous, [documentId]: true };
+    });
+  }, [documentId, collaborationRequested]);
 
   useEffect(() => {
     setShowConflictModal(false);
@@ -252,7 +305,7 @@ export const Editor = () => {
 
   // Initialize WebSocket connection for collaboration
   useEffect(() => {
-    if (!documentId || !workspaceId) {
+    if (!documentId || !workspaceId || !collaborationEnabled) {
       activeRoomRef.current = null;
       if (wsManagerRef.current) {
         wsManagerRef.current.disconnect();
@@ -329,7 +382,7 @@ export const Editor = () => {
         clearInterval(checkConnection);
       }
     };
-  }, [documentId, workspaceId]);
+  }, [documentId, workspaceId, collaborationEnabled]);
 
   useEffect(() => {
     const trimmed = searchQuery.trim();
@@ -557,6 +610,7 @@ export const Editor = () => {
                 <button
                   className="flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                   type="button"
+                  onClick={handleShareClick}
                 >
                   <span className="material-symbols-outlined !text-[18px]">share</span>
                   <span>Share</span>
@@ -577,7 +631,8 @@ export const Editor = () => {
               onYjsUpdate={handleYjsUpdate}
               onCursorUpdate={sendCursorUpdate}
               onSelectionUpdate={sendSelectionUpdate}
-              autoFocusTitle={shouldFocusTitle}
+              collaborationEnabled={collaborationEnabled}
+               autoFocusTitle={shouldFocusTitle}
               docTitle={docTitle}
               loading={loading}
               error={error}
@@ -618,6 +673,12 @@ export const Editor = () => {
         onMergeManual={handleMergeManual}
         onClose={handleConflictClose}
       />
+      {showShareModal && documentId && (
+        <ShareModal
+          documentId={documentId}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
     </div>
   );
 };

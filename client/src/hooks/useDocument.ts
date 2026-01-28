@@ -162,6 +162,9 @@ export const useDocument = (documentId?: string, workspaceId?: string) => {
 
   const updateDocumentState = useCallback(
     (next: DocumentState) => {
+      if (currentDocumentIdRef.current && currentDocumentIdRef.current !== next.id) {
+        return;
+      }
       setDocument(next);
       void cacheDocument(next).catch(() => undefined);
       saveCounterRef.current += 1;

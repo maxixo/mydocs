@@ -3,7 +3,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor as TipTapEditor, JSONContent } from "@tiptap/core";
 import { createEditorExtensions } from "./editorConfig";
 import { Toolbar } from "./Toolbar";
-import { getYjsProvider, resetProvider, type YjsProvider } from "../collaboration/yjsProvider";
+import { destroyYjsProvider, getYjsProvider, type YjsProvider } from "../collaboration/yjsProvider";
 import { createSyncManager } from "../collaboration/syncManager";
 import { useAuth } from "../auth/AuthContext";
 import { joinDocument, leaveDocument } from "../services/presence.service";
@@ -59,6 +59,7 @@ type EditorSurfaceProps = {
   onYjsUpdate?: (content: JSONContent) => void;
   onCursorUpdate?: (position: number, range?: { from: number; to: number }) => void;
   onSelectionUpdate?: (selection: { from: number; to: number }) => void;
+  collaborationEnabled?: boolean;
   autoFocusTitle?: boolean;
   loading?: boolean;
   error?: string | null;
@@ -74,6 +75,7 @@ export const EditorSurface = ({
   onYjsUpdate,
   onCursorUpdate,
   onSelectionUpdate,
+  collaborationEnabled = false,
   autoFocusTitle = false,
   docTitle,
   loading = false,
@@ -163,7 +165,7 @@ export const EditorSurface = ({
   }, [documentId]);
 
   useEffect(() => {
-    if (!documentId) {
+    if (!documentId || !collaborationEnabled) {
       setProviderState(null);
       return;
     }
@@ -172,12 +174,12 @@ export const EditorSurface = ({
     setProviderState({ documentId, provider: nextProvider });
 
     return () => {
-      resetProvider(documentId);
+      destroyYjsProvider(documentId);
     };
-  }, [documentId]);
+  }, [documentId, collaborationEnabled]);
 
   useEffect(() => {
-    if (!documentId || !presenceUserId) {
+    if (!documentId || !presenceUserId || !collaborationEnabled) {
       return;
     }
 
@@ -186,7 +188,7 @@ export const EditorSurface = ({
     return () => {
       void leaveDocument(documentId, presenceUserId).catch(() => {});
     };
-  }, [documentId, presenceUserId, presenceName, presenceAvatar]);
+  }, [documentId, presenceUserId, collaborationEnabled]);
 
   useEffect(() => {
     lastHydratedKey.current = null;
@@ -246,14 +248,14 @@ export const EditorSurface = ({
       return;
     }
 
-    // Option 1: Try to use the TipTap updateUser command if available
+    // Check if the TipTap updateUser command is available
     if (typeof safeEditor.commands.updateUser === "function") {
       safeEditor.commands.updateUser({
         name: collaborationUser.name,
         color: collaborationUser.color
       });
     } else {
-      // Option 2: Fallback to updating awareness directly
+      // Fallback: Update awareness directly if command not available
       provider.awareness.setLocalState({
         user: {
           name: collaborationUser.name,
