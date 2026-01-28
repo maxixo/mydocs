@@ -1,6 +1,56 @@
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { useAppStore, actions } from "../app/store";
+import { useAuth } from "../auth/AuthContext";
+import { fetchDocuments } from "../services/document.service";
 
 export const Recent = () => {
+  const { recentDocuments, dispatch } = useAppStore();
+  const { user, status } = useAuth();
+  const [searchParams] = useSearchParams();
+  const workspaceId = searchParams.get("workspaceId") ?? "default";
+  const [isSyncing, setIsSyncing] = useState(false);
+  const showSkeleton = isSyncing && recentDocuments.length === 0;
+  const userLabel = useMemo(() => {
+    if (status !== "authenticated") {
+      return "User";
+    }
+    return user?.name?.trim() || user?.email?.trim() || "User";
+  }, [status, user]);
+  const userInitial = useMemo(() => {
+    const firstWord = userLabel.split(/\s+/)[0];
+    return firstWord ? firstWord.charAt(0).toUpperCase() : "U";
+  }, [userLabel]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadRecentDocuments = async () => {
+      setIsSyncing(true);
+      try {
+        const docs = await fetchDocuments(workspaceId);
+        if (!isActive) {
+          return;
+        }
+        dispatch(actions.setRecentDocuments(docs));
+      } catch {
+        if (!isActive) {
+          return;
+        }
+      } finally {
+        if (isActive) {
+          setIsSyncing(false);
+        }
+      }
+    };
+
+    void loadRecentDocuments();
+
+    return () => {
+      isActive = false;
+    };
+  }, [workspaceId, dispatch]);
+
   return (
     <div className="bg-background-light text-[#0d0e1b] dark:bg-background-dark dark:text-[#f8f8fc] font-['Inter',_sans-serif]">
       <div className="flex h-screen overflow-hidden">
@@ -66,23 +116,25 @@ export const Recent = () => {
         </aside>
 
         <main className="relative flex flex-1 flex-col overflow-y-auto">
-          <div className="fixed right-6 top-6 z-50">
-            <div className="flex min-w-[280px] items-center gap-3 rounded-xl border border-[#cfd0e7] bg-white p-4 shadow-xl dark:border-[#2a2b4a] dark:bg-[#1e1f3a]">
-              <div className="relative flex items-center justify-center">
-                <span className="material-symbols-outlined spinner-rotate text-primary">sync</span>
-                <div className="dot-pulse absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-amber-500 dark:border-[#1e1f3a]"></div>
+          {isSyncing ? (
+            <div className="fixed right-6 top-6 z-50">
+              <div className="flex min-w-[280px] items-center gap-3 rounded-xl border border-[#cfd0e7] bg-white p-4 shadow-xl dark:border-[#2a2b4a] dark:bg-[#1e1f3a]">
+                <div className="relative flex items-center justify-center">
+                  <span className="material-symbols-outlined spinner-rotate text-primary">sync</span>
+                  <div className="dot-pulse absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-amber-500 dark:border-[#1e1f3a]"></div>
+                </div>
+                <div className="flex flex-col">
+                  <p className="text-sm font-bold leading-none text-[#0d0e1b] dark:text-white">Syncing...</p>
+                  <p className="mt-1 text-xs text-[#4c4d9a] dark:text-[#a1a1c9]">
+                    Updating your latest changes
+                  </p>
+                </div>
+                <button className="ml-auto text-[#cfd0e7] transition-colors hover:text-primary" type="button">
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
               </div>
-              <div className="flex flex-col">
-                <p className="text-sm font-bold leading-none text-[#0d0e1b] dark:text-white">Syncing...</p>
-                <p className="mt-1 text-xs text-[#4c4d9a] dark:text-[#a1a1c9]">
-                  Updating your latest changes
-                </p>
-              </div>
-              <button className="ml-auto text-[#cfd0e7] transition-colors hover:text-primary" type="button">
-                <span className="material-symbols-outlined text-sm">close</span>
-              </button>
             </div>
-          </div>
+          ) : null}
 
           <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[#e7e7f3] bg-background-light px-8 py-4 dark:border-[#2a2b4a] dark:bg-background-dark">
             <div className="flex-1 max-w-xl">
@@ -106,13 +158,16 @@ export const Recent = () => {
               >
                 <span className="material-symbols-outlined">help</span>
               </button>
-              <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-white dark:border-[#2a2b4a]">
-                <img
-                  className="h-full w-full object-cover"
-                  data-alt="User profile avatar circle"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJwmj2W_WdqPvAvHcb3gxU5ARhPnXnDz-NocScpKaNW27AhzfE1BUGEG3t8nrmQmY3RlinjCLXclsrCVIyddEwdQ3gaY-fEaAvspJ1JTxXGDsgjfH1wtI0Y7YqRu6G6fy_LP0CeqtEMpLgj45oR5-Va7_Gl2-DKAbujS8qzc2-8Qn4QhoL3B-_EYcE-NDhuD-fjz3MxxjWKwK8ot-eIGlqdUNnVpxG8nXjKNeS_wt9A_kfWUTk6ahPCh6ngSlIBwl9RnjDWA2zCw"
-                  alt="User profile avatar"
-                />
+              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-[#e7e7f3] text-sm font-bold text-[#4c4d9a] dark:border-[#2a2b4a] dark:bg-[#1e1f3a] dark:text-[#a1a1c9]">
+                {user?.image ? (
+                  <img
+                    className="h-full w-full object-cover"
+                    src={user.image}
+                    alt={`${userLabel} profile`}
+                  />
+                ) : (
+                  <span aria-hidden="true">{userInitial}</span>
+                )}
               </div>
             </div>
           </header>
@@ -130,94 +185,51 @@ export const Recent = () => {
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              <Link
-                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
-                to="/editor/strategy-2024"
-                aria-label="Open Product Strategy 2024"
-              >
-                <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                <div className="flex flex-col gap-2">
-                  <div className="skeleton-shimmer h-5 w-3/4 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                  <div className="skeleton-shimmer h-3 w-1/2 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
+              {showSkeleton ? (
+                Array.from({ length: 8 }).map((_, index) => (
+                  <div
+                    key={`recent-skeleton-${index}`}
+                    className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
+                  >
+                    <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
+                    <div className="flex flex-col gap-2">
+                      <div className="skeleton-shimmer h-5 w-3/4 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
+                      <div className="skeleton-shimmer h-3 w-1/2 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
+                    </div>
+                  </div>
+                ))
+              ) : recentDocuments.length > 0 ? (
+                recentDocuments.map((doc) => {
+                  const title = doc.title?.trim() ? doc.title : "Untitled document";
+                  const updatedAtLabel = doc.updatedAt
+                    ? new Date(doc.updatedAt).toLocaleDateString()
+                    : "Recently";
+                  const workspace = doc.workspaceId || workspaceId;
+
+                  return (
+                    <Link
+                      key={doc.id}
+                      className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 transition-shadow hover:shadow-lg dark:border-[#2a2b4a] dark:bg-[#16172d]"
+                      to={`/editor/${encodeURIComponent(doc.id)}?workspaceId=${encodeURIComponent(workspace)}`}
+                      aria-label={`Open ${title}`}
+                    >
+                      <div className="flex aspect-[4/3] w-full items-center justify-center rounded-lg bg-[#e7e7f3] text-[#4c4d9a] dark:bg-[#1e1f3a] dark:text-[#a1a1c9]">
+                        <span className="material-symbols-outlined text-3xl">description</span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <p className="truncate text-sm font-bold text-[#0d0e1b] dark:text-white">{title}</p>
+                        <p className="text-xs text-[#4c4d9a] dark:text-[#a1a1c9]">
+                          Updated {updatedAtLabel}
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })
+              ) : (
+                <div className="col-span-full rounded-xl border border-dashed border-[#e7e7f3] p-6 text-center text-sm text-[#4c4d9a] dark:border-[#2a2b4a] dark:text-[#a1a1c9]">
+                  No recent documents yet.
                 </div>
-              </Link>
-              <Link
-                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
-                to="/editor/q4-roadmap-2023"
-                aria-label="Open Q4 Roadmap 2023"
-              >
-                <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                <div className="flex flex-col gap-2">
-                  <div className="skeleton-shimmer h-5 w-2/3 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                  <div className="skeleton-shimmer h-3 w-1/3 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                </div>
-              </Link>
-              <Link
-                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
-                to="/editor/kickoff-notes"
-                aria-label="Open Meeting Notes Kickoff"
-              >
-                <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                <div className="flex flex-col gap-2">
-                  <div className="skeleton-shimmer h-5 w-4/5 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                  <div className="skeleton-shimmer h-3 w-2/5 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                </div>
-              </Link>
-              <Link
-                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
-                to="/editor/team-onboarding"
-                aria-label="Open Team Onboarding"
-              >
-                <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                <div className="flex flex-col gap-2">
-                  <div className="skeleton-shimmer h-5 w-1/2 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                  <div className="skeleton-shimmer h-3 w-1/4 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                </div>
-              </Link>
-              <Link
-                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
-                to="/editor/design-system"
-                aria-label="Open Design System"
-              >
-                <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                <div className="flex flex-col gap-2">
-                  <div className="skeleton-shimmer h-5 w-3/5 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                  <div className="skeleton-shimmer h-3 w-1/3 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                </div>
-              </Link>
-              <Link
-                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
-                to="/editor/marketing-plan"
-                aria-label="Open Marketing Plan"
-              >
-                <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                <div className="flex flex-col gap-2">
-                  <div className="skeleton-shimmer h-5 w-3/4 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                  <div className="skeleton-shimmer h-3 w-1/2 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                </div>
-              </Link>
-              <Link
-                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
-                to="/editor/release-notes"
-                aria-label="Open Release Notes"
-              >
-                <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                <div className="flex flex-col gap-2">
-                  <div className="skeleton-shimmer h-5 w-2/3 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                  <div className="skeleton-shimmer h-3 w-1/3 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                </div>
-              </Link>
-              <Link
-                className="group flex flex-col gap-4 rounded-xl border border-[#e7e7f3] bg-white p-4 dark:border-[#2a2b4a] dark:bg-[#16172d]"
-                to="/editor/retrospective"
-                aria-label="Open Retrospective"
-              >
-                <div className="skeleton-shimmer aspect-[4/3] w-full rounded-lg bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                <div className="flex flex-col gap-2">
-                  <div className="skeleton-shimmer h-5 w-4/5 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                  <div className="skeleton-shimmer h-3 w-2/5 rounded bg-[#e7e7f3] dark:bg-[#1e1f3a]"></div>
-                </div>
-              </Link>
+              )}
             </div>
           </div>
         </main>
