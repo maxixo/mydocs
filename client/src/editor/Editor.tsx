@@ -246,10 +246,21 @@ export const EditorSurface = ({
       return;
     }
 
-    safeEditor.commands.updateUser({
-      name: collaborationUser.name,
-      color: collaborationUser.color
-    });
+    // Option 1: Try to use the TipTap updateUser command if available
+    if (typeof safeEditor.commands.updateUser === "function") {
+      safeEditor.commands.updateUser({
+        name: collaborationUser.name,
+        color: collaborationUser.color
+      });
+    } else {
+      // Option 2: Fallback to updating awareness directly
+      provider.awareness.setLocalState({
+        user: {
+          name: collaborationUser.name,
+          color: collaborationUser.color
+        }
+      });
+    }
   }, [safeEditor, provider, collaborationUser.name, collaborationUser.color]);
 
   useEffect(() => {
